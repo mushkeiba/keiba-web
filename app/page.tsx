@@ -173,16 +173,7 @@ function RaceModal({
                     {pred.name}
                   </p>
                   {pred.isValue && (
-                    <span
-                      className="px-2 py-0.5 text-xs font-bold"
-                      style={{
-                        background: "linear-gradient(135deg, #10b981, #34d399)",
-                        color: "#fff",
-                        borderRadius: "6px",
-                      }}
-                    >
-                      妙味
-                    </span>
+                    <span style={{ fontSize: "16px" }}>🔥</span>
                   )}
                 </div>
                 <p className="text-sm" style={{ color: "#64748b" }}>
@@ -236,14 +227,8 @@ function RaceModal({
         >
           <div className="flex items-center gap-4 text-sm" style={{ color: "#64748b" }}>
             <div className="flex items-center gap-1">
-              <span
-                className="w-3 h-3"
-                style={{
-                  background: "linear-gradient(135deg, #10b981, #34d399)",
-                  borderRadius: "4px",
-                }}
-              />
-              <span>妙味 = 期待値 &gt; 1.0</span>
+              <span style={{ fontSize: "14px" }}>🔥</span>
+              <span>= 期待値 &gt; 1.5（狙い目）</span>
             </div>
           </div>
           <button
@@ -314,7 +299,8 @@ export default function Home() {
       }));
       setRaces(placeholders);
 
-      for (const rid of raceIds) {
+      // 並列でAPI呼び出し（高速化）
+      const racePromises = raceIds.map(async (rid) => {
         try {
           const raceResponse = await fetch(`${API_URL}/api/predict/race`, {
             method: "POST",
@@ -360,14 +346,19 @@ export default function Home() {
               isLoading: false,
             };
 
+            // 各レース完了時に即座に表示更新
             setRaces((prev) =>
               prev.map((r) => (r.id === formattedRace.id ? formattedRace : r))
             );
+            return formattedRace;
           }
         } catch {
           // skip
         }
-      }
+        return null;
+      });
+
+      await Promise.all(racePromises);
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラー");
     } finally {
@@ -605,26 +596,16 @@ export default function Home() {
                         </div>
 
                         {/* 馬名・騎手・妙味 */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium truncate" style={{ color: "#1e293b" }}>
+                        <div className="flex-1 min-w-0" style={{ maxWidth: "120px" }}>
+                          <div className="flex items-center gap-1">
+                            <p className="text-sm font-medium" style={{ color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                               {pred.name}
                             </p>
                             {pred.isValue && (
-                              <span
-                                className="text-xs font-bold px-1.5 py-0.5"
-                                style={{
-                                  background: "linear-gradient(135deg, #10b981, #34d399)",
-                                  color: "#fff",
-                                  borderRadius: "4px",
-                                  fontSize: "10px",
-                                }}
-                              >
-                                妙味
-                              </span>
+                              <span style={{ fontSize: "14px", flexShrink: 0 }}>🔥</span>
                             )}
                           </div>
-                          <p className="text-xs" style={{ color: "#94a3b8" }}>
+                          <p className="text-xs" style={{ color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {pred.jockey}
                           </p>
                         </div>
