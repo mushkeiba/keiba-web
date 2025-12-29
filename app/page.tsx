@@ -36,6 +36,9 @@ interface Prediction {
   prob: number;
   winRate: number;
   showRate: number;
+  odds: number;
+  expectedValue: number;
+  isValue: boolean;
 }
 
 interface Race {
@@ -91,6 +94,9 @@ export default function Home() {
           prob: number;
           win_rate: number;
           show_rate: number;
+          odds: number;
+          expected_value: number;
+          is_value: boolean;
         }>;
       }) => ({
         id: race.id,
@@ -105,6 +111,9 @@ export default function Home() {
           prob: pred.prob,
           winRate: pred.win_rate,
           showRate: pred.show_rate,
+          odds: pred.odds,
+          expectedValue: pred.expected_value,
+          isValue: pred.is_value,
         })),
       }));
 
@@ -368,18 +377,30 @@ export default function Home() {
 
                             {/* 馬情報 */}
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold truncate">{pred.name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold truncate">{pred.name}</p>
+                                {pred.isValue && (
+                                  <span className="px-2 py-0.5 text-xs font-bold bg-green-500 text-white rounded-full animate-pulse">
+                                    買い
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">
                                 勝率 {pred.winRate}% • 複勝 {pred.showRate}%
                               </p>
                             </div>
 
-                            {/* 確率 */}
+                            {/* オッズ・確率 */}
                             <div className="text-right">
                               <p className="text-xl font-bold text-primary">
                                 {(pred.prob * 100).toFixed(0)}
                                 <span className="text-sm">%</span>
                               </p>
+                              {pred.odds > 0 && (
+                                <p className={`text-sm font-medium ${pred.isValue ? 'text-green-400' : 'text-muted-foreground'}`}>
+                                  {pred.odds.toFixed(1)}倍
+                                </p>
+                              )}
                             </div>
                           </div>
                         );
