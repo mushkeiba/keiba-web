@@ -46,6 +46,223 @@ interface RaceWithLoading extends Race {
   isLoading?: boolean;
 }
 
+// モーダルコンポーネント
+function RaceModal({
+  race,
+  onClose,
+}: {
+  race: RaceWithLoading;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        style={{
+          background: "#fff",
+          borderRadius: "20px",
+          boxShadow: "0 25px 50px rgba(0,0,0,0.25)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div
+          className="px-6 py-4 text-white flex items-center justify-between"
+          style={{
+            background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+          }}
+        >
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-bold">{race.id}R</span>
+              <span className="text-white/80">{race.distance}m</span>
+              {race.time && (
+                <span
+                  className="px-2 py-1 text-xs font-medium"
+                  style={{ background: "rgba(255,255,255,0.2)", borderRadius: "6px" }}
+                >
+                  {race.time}
+                </span>
+              )}
+            </div>
+            {race.name && (
+              <p className="text-sm text-white/90 mt-1">{race.name}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="flex-1 overflow-y-auto">
+          {/* 凡例 */}
+          <div
+            className="px-6 py-3 text-xs flex items-center gap-4"
+            style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}
+          >
+            <span style={{ color: "#64748b" }}>順位</span>
+            <span style={{ color: "#64748b" }}>馬番</span>
+            <span style={{ color: "#64748b" }} className="flex-1">馬名 / 騎手</span>
+            <span style={{ color: "#64748b", width: "60px", textAlign: "right" }}>オッズ</span>
+            <span style={{ color: "#64748b", width: "50px", textAlign: "right" }}>勝率</span>
+            <span style={{ color: "#64748b", width: "50px", textAlign: "right" }}>複勝</span>
+            <span style={{ color: "#64748b", width: "60px", textAlign: "right" }}>AI予測</span>
+          </div>
+
+          {race.predictions.map((pred, index) => (
+            <div
+              key={pred.number}
+              className="px-6 py-4 flex items-center gap-4 transition-colors hover:bg-slate-50"
+              style={{
+                borderBottom: index < race.predictions.length - 1 ? "1px solid #f1f5f9" : "none",
+                background: pred.isValue ? "rgba(16, 185, 129, 0.05)" : undefined,
+              }}
+            >
+              {/* 順位 */}
+              <div
+                className="w-8 h-8 flex items-center justify-center text-sm font-bold"
+                style={{
+                  borderRadius: "8px",
+                  background:
+                    pred.rank === 1
+                      ? "linear-gradient(135deg, #fef3c7, #fde68a)"
+                      : pred.rank === 2
+                      ? "linear-gradient(135deg, #f1f5f9, #e2e8f0)"
+                      : pred.rank === 3
+                      ? "linear-gradient(135deg, #fed7aa, #fdba74)"
+                      : "#f1f5f9",
+                  color:
+                    pred.rank === 1
+                      ? "#92400e"
+                      : pred.rank === 2
+                      ? "#475569"
+                      : pred.rank === 3
+                      ? "#9a3412"
+                      : "#64748b",
+                }}
+              >
+                {pred.rank}
+              </div>
+
+              {/* 馬番 */}
+              <div
+                className="w-10 h-10 flex items-center justify-center text-white font-bold"
+                style={{
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                  boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
+                }}
+              >
+                {pred.number}
+              </div>
+
+              {/* 馬名 / 騎手 */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold truncate" style={{ color: "#1e293b" }}>
+                    {pred.name}
+                  </p>
+                  {pred.isValue && (
+                    <span
+                      className="px-2 py-0.5 text-xs font-bold"
+                      style={{
+                        background: "linear-gradient(135deg, #10b981, #34d399)",
+                        color: "#fff",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      妙味
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm" style={{ color: "#64748b" }}>
+                  {pred.jockey}
+                </p>
+              </div>
+
+              {/* オッズ */}
+              <div style={{ width: "60px", textAlign: "right" }}>
+                <span
+                  className="font-bold"
+                  style={{
+                    color: pred.odds < 5 ? "#dc2626" : pred.odds < 10 ? "#ea580c" : "#64748b",
+                  }}
+                >
+                  {pred.odds > 0 ? pred.odds.toFixed(1) : "-"}
+                </span>
+              </div>
+
+              {/* 勝率 */}
+              <div style={{ width: "50px", textAlign: "right" }}>
+                <span style={{ color: "#475569", fontSize: "0.875rem" }}>
+                  {(pred.winRate * 100).toFixed(0)}%
+                </span>
+              </div>
+
+              {/* 複勝率 */}
+              <div style={{ width: "50px", textAlign: "right" }}>
+                <span style={{ color: "#475569", fontSize: "0.875rem" }}>
+                  {(pred.showRate * 100).toFixed(0)}%
+                </span>
+              </div>
+
+              {/* AI予測 */}
+              <div style={{ width: "60px", textAlign: "right" }}>
+                <span
+                  className="text-lg font-bold"
+                  style={{ color: "#0d9488", fontFamily: "monospace" }}
+                >
+                  {(pred.prob * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Modal Footer */}
+        <div
+          className="px-6 py-4 flex items-center justify-between"
+          style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}
+        >
+          <div className="flex items-center gap-4 text-sm" style={{ color: "#64748b" }}>
+            <div className="flex items-center gap-1">
+              <span
+                className="w-3 h-3"
+                style={{
+                  background: "linear-gradient(135deg, #10b981, #34d399)",
+                  borderRadius: "4px",
+                }}
+              />
+              <span>妙味 = 期待値 &gt; 1.0</span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 font-medium transition-colors"
+            style={{
+              background: "#e2e8f0",
+              color: "#475569",
+              borderRadius: "8px",
+            }}
+          >
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [selectedTrack, setSelectedTrack] = useState(TRACKS[0].code);
   const [selectedDate, setSelectedDate] = useState(
@@ -54,6 +271,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [races, setRaces] = useState<RaceWithLoading[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRace, setSelectedRace] = useState<RaceWithLoading | null>(null);
 
   const currentTrack = TRACKS.find((t) => t.code === selectedTrack);
 
@@ -111,9 +329,9 @@ export default function Home() {
             const raceData = await raceResponse.json();
             const formattedRace: RaceWithLoading = {
               id: raceData.id,
-              name: raceData.name,
+              name: raceData.name || "",
               distance: raceData.distance,
-              time: raceData.time,
+              time: raceData.time || "",
               predictions: raceData.predictions.map(
                 (pred: {
                   rank: number;
@@ -161,7 +379,7 @@ export default function Home() {
     <div className="min-h-screen" style={{ background: "#e8f5f3" }}>
       {/* Header */}
       <header
-        className="sticky top-0 z-50 text-white"
+        className="sticky top-0 z-40 text-white"
         style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)" }}
       >
         <div className="max-w-6xl mx-auto px-4 py-3">
@@ -179,7 +397,6 @@ export default function Home() {
             boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
           }}
         >
-          {/* Card Header */}
           <div
             className="px-5 py-4 text-white flex items-center gap-3"
             style={{ background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)" }}
@@ -193,10 +410,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Card Body */}
           <div className="p-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* 日付 */}
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: "#475569" }}>
                   日付
@@ -214,7 +429,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* 競馬場 */}
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: "#475569" }}>
                   競馬場
@@ -237,7 +451,6 @@ export default function Home() {
                 </select>
               </div>
 
-              {/* ボタン */}
               <div className="flex items-end">
                 <button
                   onClick={handlePredict}
@@ -268,17 +481,22 @@ export default function Home() {
 
         {/* Results Header */}
         {races.length > 0 && (
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold" style={{ color: "#1e293b" }}>
-              {currentTrack?.name}競馬場
-            </h2>
-            <span className="text-sm" style={{ color: "#64748b" }}>
-              {new Date(selectedDate).toLocaleDateString("ja-JP", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold" style={{ color: "#1e293b" }}>
+                {currentTrack?.name}競馬場
+              </h2>
+              <span className="text-sm" style={{ color: "#64748b" }}>
+                {new Date(selectedDate).toLocaleDateString("ja-JP", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </span>
+            </div>
+            <p className="text-sm" style={{ color: "#64748b" }}>
+              カードをクリックで詳細表示
+            </p>
           </div>
         )}
 
@@ -288,22 +506,46 @@ export default function Home() {
             {races.map((race) => (
               <div
                 key={race.id}
-                className="overflow-hidden transition-all hover:-translate-y-0.5"
+                className="overflow-hidden transition-all cursor-pointer"
                 style={{
                   background: "#fff",
                   borderRadius: "16px",
                   boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                 }}
+                onClick={() => !race.isLoading && setSelectedRace(race)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.12)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.08)";
+                }}
               >
                 {/* Race Header */}
                 <div
-                  className="px-4 py-3 text-white flex items-center gap-3"
+                  className="px-4 py-3 text-white flex items-center justify-between"
                   style={{ background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)" }}
                 >
-                  <span className="font-bold text-lg">{race.id}R</span>
-                  {!race.isLoading && (
-                    <span className="text-sm opacity-80">{race.distance}m</span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-lg">{race.id}R</span>
+                    {!race.isLoading && (
+                      <>
+                        <span className="text-sm opacity-80">{race.distance}m</span>
+                        {race.time && (
+                          <span
+                            className="text-xs px-2 py-0.5"
+                            style={{ background: "rgba(255,255,255,0.2)", borderRadius: "4px" }}
+                          >
+                            {race.time}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <svg className="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
 
                 {/* Predictions */}
@@ -313,19 +555,22 @@ export default function Home() {
                       {[1, 2, 3].map((i) => (
                         <div
                           key={i}
-                          className="h-12 animate-pulse"
+                          className="h-14 animate-pulse"
                           style={{ background: "#f1f5f9", borderRadius: "8px" }}
                         />
                       ))}
                     </div>
                   ) : (
-                    race.predictions.map((pred) => (
+                    race.predictions.slice(0, 3).map((pred, index) => (
                       <div
                         key={pred.number}
-                        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
-                        style={{ borderBottom: "1px solid #f1f5f9" }}
+                        className="flex items-center gap-3 px-4 py-3"
+                        style={{
+                          borderBottom: index < 2 ? "1px solid #f1f5f9" : "none",
+                          background: pred.isValue ? "rgba(16, 185, 129, 0.05)" : undefined,
+                        }}
                       >
-                        {/* Rank Badge */}
+                        {/* 順位 */}
                         <div
                           className="w-7 h-7 flex items-center justify-center text-xs font-bold"
                           style={{
@@ -335,23 +580,19 @@ export default function Home() {
                                 ? "linear-gradient(135deg, #fef3c7, #fde68a)"
                                 : pred.rank === 2
                                 ? "linear-gradient(135deg, #f1f5f9, #e2e8f0)"
-                                : pred.rank === 3
-                                ? "linear-gradient(135deg, #fed7aa, #fdba74)"
-                                : "#f1f5f9",
+                                : "linear-gradient(135deg, #fed7aa, #fdba74)",
                             color:
                               pred.rank === 1
                                 ? "#92400e"
                                 : pred.rank === 2
                                 ? "#475569"
-                                : pred.rank === 3
-                                ? "#9a3412"
-                                : "#64748b",
+                                : "#9a3412",
                           }}
                         >
                           {pred.rank}
                         </div>
 
-                        {/* Horse Number */}
+                        {/* 馬番 */}
                         <div
                           className="w-8 h-8 flex items-center justify-center text-white text-sm font-bold"
                           style={{
@@ -363,36 +604,66 @@ export default function Home() {
                           {pred.number}
                         </div>
 
-                        {/* Name */}
+                        {/* 馬名・騎手・妙味 */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: "#1e293b" }}>
-                            {pred.name}
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate" style={{ color: "#1e293b" }}>
+                              {pred.name}
+                            </p>
+                            {pred.isValue && (
+                              <span
+                                className="text-xs font-bold px-1.5 py-0.5"
+                                style={{
+                                  background: "linear-gradient(135deg, #10b981, #34d399)",
+                                  color: "#fff",
+                                  borderRadius: "4px",
+                                  fontSize: "10px",
+                                }}
+                              >
+                                妙味
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs" style={{ color: "#94a3b8" }}>
+                            {pred.jockey}
                           </p>
-                          {pred.isValue && (
-                            <span
-                              className="text-xs font-semibold px-2 py-0.5"
-                              style={{
-                                background: "#d1fae5",
-                                color: "#065f46",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              妙味
-                            </span>
-                          )}
                         </div>
 
-                        {/* Probability */}
-                        <div
-                          className="text-lg font-bold"
-                          style={{ color: "#0d9488", fontFamily: "monospace" }}
-                        >
-                          {(pred.prob * 100).toFixed(0)}%
+                        {/* オッズ */}
+                        <div className="text-right">
+                          <p
+                            className="text-sm font-bold"
+                            style={{
+                              color: pred.odds < 5 ? "#dc2626" : pred.odds < 10 ? "#ea580c" : "#64748b",
+                            }}
+                          >
+                            {pred.odds > 0 ? `${pred.odds.toFixed(1)}倍` : "-"}
+                          </p>
+                        </div>
+
+                        {/* 確率 */}
+                        <div className="text-right" style={{ minWidth: "48px" }}>
+                          <p
+                            className="text-lg font-bold"
+                            style={{ color: "#0d9488", fontFamily: "monospace" }}
+                          >
+                            {(pred.prob * 100).toFixed(0)}%
+                          </p>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
+
+                {/* Card Footer */}
+                {!race.isLoading && race.predictions.length > 3 && (
+                  <div
+                    className="px-4 py-2 text-center text-sm"
+                    style={{ background: "#f8fafc", color: "#64748b" }}
+                  >
+                    他 {race.predictions.length - 3} 頭
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -422,11 +693,14 @@ export default function Home() {
               boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
             }}
           >
-            <svg className="w-12 h-12 mx-auto mb-4" style={{ color: "#cbd5e1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-16 h-16 mx-auto mb-4" style={{ color: "#cbd5e1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
+            <p className="text-lg mb-2" style={{ color: "#64748b" }}>
+              レース予測を開始しましょう
+            </p>
             <p style={{ color: "#94a3b8" }}>
-              日付と競馬場を選択して予測してください
+              日付と競馬場を選択して「予測する」をクリック
             </p>
           </div>
         )}
@@ -462,6 +736,11 @@ export default function Home() {
           </button>
         </div>
       </nav>
+
+      {/* Modal */}
+      {selectedRace && (
+        <RaceModal race={selectedRace} onClose={() => setSelectedRace(null)} />
+      )}
     </div>
   );
 }
