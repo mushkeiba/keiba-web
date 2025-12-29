@@ -299,8 +299,8 @@ export default function Home() {
       }));
       setRaces(placeholders);
 
-      // 並列でAPI呼び出し（高速化）
-      const racePromises = raceIds.map(async (rid) => {
+      // 順次取得（1レースずつ表示）
+      for (const rid of raceIds) {
         try {
           const raceResponse = await fetch(`${API_URL}/api/predict/race`, {
             method: "POST",
@@ -346,19 +346,14 @@ export default function Home() {
               isLoading: false,
             };
 
-            // 各レース完了時に即座に表示更新
             setRaces((prev) =>
               prev.map((r) => (r.id === formattedRace.id ? formattedRace : r))
             );
-            return formattedRace;
           }
         } catch {
           // skip
         }
-        return null;
-      });
-
-      await Promise.all(racePromises);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラー");
     } finally {
