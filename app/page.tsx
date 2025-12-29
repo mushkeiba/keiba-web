@@ -205,14 +205,14 @@ function RaceModal({
               {/* 勝率 */}
               <div style={{ width: "50px", textAlign: "right" }}>
                 <span style={{ color: "#475569", fontSize: "0.875rem" }}>
-                  {(pred.winRate * 100).toFixed(0)}%
+                  {pred.winRate.toFixed(0)}%
                 </span>
               </div>
 
               {/* 複勝率 */}
               <div style={{ width: "50px", textAlign: "right" }}>
                 <span style={{ color: "#475569", fontSize: "0.875rem" }}>
-                  {(pred.showRate * 100).toFixed(0)}%
+                  {pred.showRate.toFixed(0)}%
                 </span>
               </div>
 
