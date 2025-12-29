@@ -441,11 +441,9 @@ export default function Home() {
                                 {(pred.prob * 100).toFixed(0)}
                                 <span className="text-sm">%</span>
                               </p>
-                              {pred.odds > 0 && (
-                                <p className={`text-sm font-medium ${pred.isValue ? 'text-green-400' : 'text-muted-foreground'}`}>
-                                  {pred.odds.toFixed(1)}倍
-                                </p>
-                              )}
+                              <p className={`text-sm font-medium ${pred.isValue ? 'text-green-400' : 'text-muted-foreground'}`}>
+                                {pred.odds > 0 ? `${pred.odds.toFixed(1)}倍` : '-'}
+                              </p>
                             </div>
                           </div>
                         );
