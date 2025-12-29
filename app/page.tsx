@@ -1,33 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 
-// API URL (環境変数から取得、なければローカル)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// 競馬場データ
 const TRACKS = [
-  { name: "大井", code: "44", emoji: "🏟️" },
-  { name: "川崎", code: "45", emoji: "🌊" },
-  { name: "船橋", code: "43", emoji: "⚓" },
-  { name: "浦和", code: "42", emoji: "🌸" },
-  { name: "門別", code: "30", emoji: "🐴" },
-  { name: "盛岡", code: "35", emoji: "⛰️" },
-  { name: "水沢", code: "36", emoji: "💧" },
-  { name: "金沢", code: "46", emoji: "✨" },
-  { name: "笠松", code: "47", emoji: "🎋" },
-  { name: "名古屋", code: "48", emoji: "🏯" },
-  { name: "園田", code: "50", emoji: "🌳" },
-  { name: "姫路", code: "51", emoji: "🏰" },
-  { name: "高知", code: "54", emoji: "🐋" },
-  { name: "佐賀", code: "55", emoji: "🎋" },
+  { name: "大井", code: "44" },
+  { name: "川崎", code: "45" },
+  { name: "船橋", code: "43" },
+  { name: "浦和", code: "42" },
+  { name: "門別", code: "30" },
+  { name: "盛岡", code: "35" },
+  { name: "水沢", code: "36" },
+  { name: "金沢", code: "46" },
+  { name: "笠松", code: "47" },
+  { name: "名古屋", code: "48" },
+  { name: "園田", code: "50" },
+  { name: "姫路", code: "51" },
+  { name: "高知", code: "54" },
+  { name: "佐賀", code: "55" },
 ];
 
-// 型定義
 interface Prediction {
   rank: number;
   number: number;
@@ -49,39 +42,39 @@ interface Race {
   predictions: Prediction[];
 }
 
-// レース読み込み状態を含む型
 interface RaceWithLoading extends Race {
   isLoading?: boolean;
 }
 
 export default function Home() {
-  const [selectedTrack, setSelectedTrack] = useState(TRACKS[0]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedTrack, setSelectedTrack] = useState(TRACKS[0].code);
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [races, setRaces] = useState<RaceWithLoading[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [loadingCount, setLoadingCount] = useState({ current: 0, total: 0 });
+
+  const currentTrack = TRACKS.find((t) => t.code === selectedTrack);
 
   const handlePredict = async () => {
     setIsLoading(true);
     setError(null);
     setRaces([]);
-    setLoadingCount({ current: 0, total: 0 });
 
     try {
-      // 1. レース一覧を取得
       const listResponse = await fetch(`${API_URL}/api/races`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          track_code: selectedTrack.code,
+          track_code: selectedTrack,
           date: selectedDate,
         }),
       });
 
       if (!listResponse.ok) {
         const errorData = await listResponse.json();
-        throw new Error(errorData.detail || "レース一覧の取得に失敗しました");
+        throw new Error(errorData.detail || "取得に失敗しました");
       }
 
       const listData = await listResponse.json();
@@ -93,28 +86,24 @@ export default function Home() {
         return;
       }
 
-      // 2. プレースホルダーを作成（ローディング状態）
       const placeholders: RaceWithLoading[] = raceIds.map((rid) => ({
         id: rid.slice(-2),
-        name: `${rid.slice(-2)}R 読み込み中...`,
+        name: "",
         distance: 0,
         time: "",
         predictions: [],
         isLoading: true,
       }));
       setRaces(placeholders);
-      setLoadingCount({ current: 0, total: raceIds.length });
 
-      // 3. 各レースを順次読み込み
-      for (let i = 0; i < raceIds.length; i++) {
-        const rid = raceIds[i];
+      for (const rid of raceIds) {
         try {
           const raceResponse = await fetch(`${API_URL}/api/predict/race`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               race_id: rid,
-              track_code: selectedTrack.code,
+              track_code: selectedTrack,
             }),
           });
 
@@ -125,378 +114,354 @@ export default function Home() {
               name: raceData.name,
               distance: raceData.distance,
               time: raceData.time,
-              predictions: raceData.predictions.map((pred: {
-                rank: number;
-                number: number;
-                name: string;
-                jockey: string;
-                prob: number;
-                win_rate: number;
-                show_rate: number;
-                odds: number;
-                expected_value: number;
-                is_value: boolean;
-              }) => ({
-                rank: pred.rank,
-                number: pred.number,
-                name: pred.name,
-                jockey: pred.jockey,
-                prob: pred.prob,
-                winRate: pred.win_rate,
-                showRate: pred.show_rate,
-                odds: pred.odds,
-                expectedValue: pred.expected_value,
-                isValue: pred.is_value,
-              })),
+              predictions: raceData.predictions.map(
+                (pred: {
+                  rank: number;
+                  number: number;
+                  name: string;
+                  jockey: string;
+                  prob: number;
+                  win_rate: number;
+                  show_rate: number;
+                  odds: number;
+                  expected_value: number;
+                  is_value: boolean;
+                }) => ({
+                  rank: pred.rank,
+                  number: pred.number,
+                  name: pred.name,
+                  jockey: pred.jockey,
+                  prob: pred.prob,
+                  winRate: pred.win_rate,
+                  showRate: pred.show_rate,
+                  odds: pred.odds,
+                  expectedValue: pred.expected_value,
+                  isValue: pred.is_value,
+                })
+              ),
               isLoading: false,
             };
 
-            // 該当レースを更新
             setRaces((prev) =>
               prev.map((r) => (r.id === formattedRace.id ? formattedRace : r))
             );
           }
         } catch {
-          // 個別レースのエラーは無視して続行
+          // skip
         }
-        setLoadingCount({ current: i + 1, total: raceIds.length });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "エラーが発生しました");
+      setError(err instanceof Error ? err.message : "エラー");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getRankStyle = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return {
-          bg: "bg-gradient-to-r from-amber-500/20 to-yellow-500/20",
-          border: "border-amber-500/50",
-          badge: "gradient-gold text-slate-900",
-          glow: "shadow-amber-500/20",
-        };
-      case 2:
-        return {
-          bg: "bg-gradient-to-r from-slate-400/20 to-gray-300/20",
-          border: "border-slate-400/50",
-          badge: "gradient-silver text-slate-900",
-          glow: "shadow-slate-400/20",
-        };
-      case 3:
-        return {
-          bg: "bg-gradient-to-r from-orange-600/20 to-amber-600/20",
-          border: "border-orange-600/50",
-          badge: "gradient-bronze text-white",
-          glow: "shadow-orange-500/20",
-        };
-      default:
-        return {
-          bg: "bg-card",
-          border: "border-border",
-          badge: "bg-muted",
-          glow: "",
-        };
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* PC用サイドバー + メインコンテンツ */}
-      <div className="lg:flex">
-        {/* サイドバー（PCのみ） */}
-        <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col">
-          <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-border/50 bg-card/50 px-6 py-8">
-            {/* ロゴ */}
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl gradient-primary text-2xl">
-                🏇
-              </div>
-              <div>
-                <h1 className="text-xl font-bold">地方競馬AI</h1>
-                <p className="text-xs text-muted-foreground">AI Prediction</p>
-              </div>
-            </div>
+    <div className="min-h-screen" style={{ background: "#e8f5f3" }}>
+      {/* Header */}
+      <header
+        className="sticky top-0 z-50 text-white"
+        style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)" }}
+      >
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <h1 className="text-lg font-semibold">地方競馬 AI 予測</h1>
+        </div>
+      </header>
 
-            {/* 日付選択 */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">予測日</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-
-            {/* 競馬場選択 */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">競馬場</label>
-              <div className="grid grid-cols-2 gap-2">
-                {TRACKS.map((track) => (
-                  <button
-                    key={track.code}
-                    onClick={() => setSelectedTrack(track)}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-all ${
-                      selectedTrack.code === track.code
-                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                        : "bg-secondary/50 hover:bg-secondary"
-                    }`}
-                  >
-                    <span>{track.emoji}</span>
-                    <span>{track.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 予測ボタン */}
-            <Button
-              onClick={handlePredict}
-              disabled={isLoading}
-              className="w-full rounded-xl py-6 text-base gradient-primary border-0 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all"
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  予測中...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <span className="text-lg">🔮</span>
-                  予測を実行
-                </span>
-              )}
-            </Button>
-
-            {/* ステータス */}
-            <div className="mt-auto rounded-xl bg-secondary/50 p-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-muted-foreground">モデル: {selectedTrack.name}</span>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                最終更新: 2024/12/29
-              </p>
+      <main className="max-w-6xl mx-auto px-4 py-6 pb-24 md:pb-6">
+        {/* Form Card */}
+        <div
+          className="mb-6 overflow-hidden"
+          style={{
+            background: "#fff",
+            borderRadius: "16px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          {/* Card Header */}
+          <div
+            className="px-5 py-4 text-white flex items-center gap-3"
+            style={{ background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)" }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <div>
+              <h3 className="font-semibold">レース予測</h3>
+              <p className="text-sm opacity-90">日付と競馬場を選択してください</p>
             </div>
           </div>
-        </aside>
 
-        {/* メインコンテンツ */}
-        <main className="lg:pl-72 flex-1">
-          {/* モバイルヘッダー */}
-          <header className="sticky top-0 z-50 border-b border-border/50 glass lg:hidden">
-            <div className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary text-lg">
-                    🏇
-                  </div>
-                  <h1 className="font-bold">地方競馬AI</h1>
-                </div>
-                <Badge variant="outline" className="border-primary/50 text-primary">
-                  β版
-                </Badge>
+          {/* Card Body */}
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* 日付 */}
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: "#475569" }}>
+                  日付
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full px-4 py-3 text-base outline-none transition-all"
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    background: "#fff",
+                  }}
+                />
               </div>
-            </div>
-          </header>
 
-          {/* モバイル: 競馬場タブ */}
-          <div className="border-b border-border/50 lg:hidden overflow-x-auto">
-            <div className="flex gap-2 px-4 py-3">
-              {TRACKS.map((track) => (
-                <button
-                  key={track.code}
-                  onClick={() => setSelectedTrack(track)}
-                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm transition-all ${
-                    selectedTrack.code === track.code
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                      : "bg-secondary/50 hover:bg-secondary"
-                  }`}
+              {/* 競馬場 */}
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: "#475569" }}>
+                  競馬場
+                </label>
+                <select
+                  value={selectedTrack}
+                  onChange={(e) => setSelectedTrack(e.target.value)}
+                  className="w-full px-4 py-3 text-base outline-none transition-all cursor-pointer"
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    background: "#fff",
+                  }}
                 >
-                  <span>{track.emoji}</span>
-                  <span>{track.name}</span>
+                  {TRACKS.map((track) => (
+                    <option key={track.code} value={track.code}>
+                      {track.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ボタン */}
+              <div className="flex items-end">
+                <button
+                  onClick={handlePredict}
+                  disabled={isLoading}
+                  className="w-full md:w-auto px-6 py-3 text-white font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                  style={{
+                    background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                    borderRadius: "12px",
+                    boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
+                  }}
+                >
+                  {isLoading ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      予測中...
+                    </>
+                  ) : (
+                    "予測する"
+                  )}
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* モバイル: 日付選択 & 予測ボタン */}
-          <div className="flex items-center gap-3 border-b border-border/50 px-4 py-3 lg:hidden">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="flex-1 rounded-xl border border-border bg-secondary/50 px-4 py-2.5 text-sm outline-none focus:border-primary"
-            />
-            <Button
-              onClick={handlePredict}
-              disabled={isLoading}
-              className="rounded-xl px-6 gradient-primary border-0 shadow-lg shadow-primary/25"
-            >
-              {isLoading ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                "🔮 予測"
-              )}
-            </Button>
-          </div>
-
-          {/* PC: ヘッダー */}
-          <div className="hidden lg:block border-b border-border/50 px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  {selectedTrack.emoji} {selectedTrack.name}競馬場
-                </h2>
-                <p className="text-muted-foreground mt-1">
-                  {new Date(selectedDate).toLocaleDateString("ja-JP", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    weekday: "long",
-                  })}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                {loadingCount.total > 0 && loadingCount.current < loadingCount.total && (
-                  <span className="text-sm text-muted-foreground">
-                    {loadingCount.current}/{loadingCount.total} 読み込み中...
-                  </span>
-                )}
-                <Badge variant="outline" className="border-primary/50 text-primary px-4 py-1">
-                  {races.length} レース
-                </Badge>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* レース一覧 */}
-          <div className="p-4 lg:p-8">
-            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-              {races.length > 0 ? (
-                races.map((race) => (
-                  <Card key={race.id} className="overflow-hidden bg-card/50 backdrop-blur border-border/50 hover:border-primary/30 transition-all">
-                    {/* レースヘッダー */}
-                    <div className="flex items-center justify-between border-b border-border/50 px-4 py-3 bg-secondary/30">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold">
-                          {race.id}R
+        {/* Results Header */}
+        {races.length > 0 && (
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-lg font-semibold" style={{ color: "#1e293b" }}>
+              {currentTrack?.name}競馬場
+            </h2>
+            <span className="text-sm" style={{ color: "#64748b" }}>
+              {new Date(selectedDate).toLocaleDateString("ja-JP", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
+          </div>
+        )}
+
+        {/* Race Cards Grid */}
+        {races.length > 0 && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {races.map((race) => (
+              <div
+                key={race.id}
+                className="overflow-hidden transition-all hover:-translate-y-0.5"
+                style={{
+                  background: "#fff",
+                  borderRadius: "16px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                }}
+              >
+                {/* Race Header */}
+                <div
+                  className="px-4 py-3 text-white flex items-center gap-3"
+                  style={{ background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)" }}
+                >
+                  <span className="font-bold text-lg">{race.id}R</span>
+                  {!race.isLoading && (
+                    <span className="text-sm opacity-80">{race.distance}m</span>
+                  )}
+                </div>
+
+                {/* Predictions */}
+                <div>
+                  {race.isLoading ? (
+                    <div className="p-4 space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="h-12 animate-pulse"
+                          style={{ background: "#f1f5f9", borderRadius: "8px" }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    race.predictions.map((pred) => (
+                      <div
+                        key={pred.number}
+                        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+                        style={{ borderBottom: "1px solid #f1f5f9" }}
+                      >
+                        {/* Rank Badge */}
+                        <div
+                          className="w-7 h-7 flex items-center justify-center text-xs font-bold"
+                          style={{
+                            borderRadius: "8px",
+                            background:
+                              pred.rank === 1
+                                ? "linear-gradient(135deg, #fef3c7, #fde68a)"
+                                : pred.rank === 2
+                                ? "linear-gradient(135deg, #f1f5f9, #e2e8f0)"
+                                : pred.rank === 3
+                                ? "linear-gradient(135deg, #fed7aa, #fdba74)"
+                                : "#f1f5f9",
+                            color:
+                              pred.rank === 1
+                                ? "#92400e"
+                                : pred.rank === 2
+                                ? "#475569"
+                                : pred.rank === 3
+                                ? "#9a3412"
+                                : "#64748b",
+                          }}
+                        >
+                          {pred.rank}
                         </div>
-                        <div>
-                          <h3 className="font-semibold">{race.isLoading ? `${race.id}R 読み込み中...` : race.name}</h3>
-                          <p className="text-xs text-muted-foreground">
-                            {race.isLoading ? "予測中..." : `${race.distance}m • ${race.time}発走`}
+
+                        {/* Horse Number */}
+                        <div
+                          className="w-8 h-8 flex items-center justify-center text-white text-sm font-bold"
+                          style={{
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                            boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
+                          }}
+                        >
+                          {pred.number}
+                        </div>
+
+                        {/* Name */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: "#1e293b" }}>
+                            {pred.name}
                           </p>
+                          {pred.isValue && (
+                            <span
+                              className="text-xs font-semibold px-2 py-0.5"
+                              style={{
+                                background: "#d1fae5",
+                                color: "#065f46",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              妙味
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Probability */}
+                        <div
+                          className="text-lg font-bold"
+                          style={{ color: "#0d9488", fontFamily: "monospace" }}
+                        >
+                          {(pred.prob * 100).toFixed(0)}%
                         </div>
                       </div>
-                      {race.isLoading && (
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      )}
-                    </div>
-
-                    {/* 予測結果 */}
-                    <div className="p-4 space-y-3">
-                      {race.isLoading ? (
-                        // ローディング中はスケルトン表示
-                        Array.from({ length: 3 }).map((_, j) => (
-                          <Skeleton key={j} className="h-16 w-full rounded-xl" />
-                        ))
-                      ) : race.predictions.map((pred) => {
-                        const style = getRankStyle(pred.rank);
-                        return (
-                          <div
-                            key={pred.number}
-                            className={`flex items-center gap-3 rounded-xl border p-3 transition-all hover:scale-[1.02] ${style.bg} ${style.border} ${style.glow} shadow-lg`}
-                          >
-                            {/* 順位バッジ */}
-                            <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold ${style.badge}`}>
-                              {pred.rank}
-                            </div>
-
-                            {/* 馬番 */}
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground shadow-lg shadow-primary/30">
-                              {pred.number}
-                            </div>
-
-                            {/* 馬情報 */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold truncate">{pred.name}</p>
-                                {pred.isValue && (
-                                  <span className="px-2 py-0.5 text-xs font-bold bg-green-500 text-white rounded-full animate-pulse">
-                                    買い
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                勝率 {pred.winRate}% • 複勝 {pred.showRate}%
-                              </p>
-                            </div>
-
-                            {/* オッズ・確率 */}
-                            <div className="text-right">
-                              <p className="text-xl font-bold text-primary">
-                                {(pred.prob * 100).toFixed(0)}
-                                <span className="text-sm">%</span>
-                              </p>
-                              <p className={`text-sm font-medium ${pred.isValue ? 'text-green-400' : 'text-muted-foreground'}`}>
-                                {pred.odds > 0 ? `${pred.odds.toFixed(1)}倍` : '-'}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
-                ))
-              ) : error ? (
-                <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-                  <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-                    <span className="text-4xl">⚠️</span>
-                  </div>
-                  <p className="text-lg font-medium text-destructive">{error}</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    日付や競馬場を変更して再度お試しください
-                  </p>
+                    ))
+                  )}
                 </div>
-              ) : (
-                <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-                  <div className="h-20 w-20 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
-                    <span className="text-4xl">🔮</span>
-                  </div>
-                  <p className="text-lg font-medium">予測を実行してください</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    競馬場と日付を選択して「予測を実行」ボタンを押してください
-                  </p>
-                </div>
-              )}
-            </div>
+              </div>
+            ))}
           </div>
-        </main>
-      </div>
+        )}
 
-      {/* モバイル: ボトムナビ */}
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-border/50 glass lg:hidden">
-        <div className="flex items-center justify-around py-2">
-          <button className="flex flex-col items-center gap-1 px-6 py-2 text-primary">
-            <span className="text-xl">🏠</span>
-            <span className="text-[10px] font-medium">ホーム</span>
+        {/* Error */}
+        {error && (
+          <div
+            className="p-6 text-center"
+            style={{
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: "16px",
+            }}
+          >
+            <p className="font-medium" style={{ color: "#dc2626" }}>{error}</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && races.length === 0 && !error && (
+          <div
+            className="p-12 text-center"
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            }}
+          >
+            <svg className="w-12 h-12 mx-auto mb-4" style={{ color: "#cbd5e1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p style={{ color: "#94a3b8" }}>
+              日付と競馬場を選択して予測してください
+            </p>
+          </div>
+        )}
+      </main>
+
+      {/* Bottom Navigation - Mobile Only */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 md:hidden"
+        style={{
+          background: "#fff",
+          borderTop: "1px solid #e2e8f0",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        <div className="flex justify-around py-2">
+          <button className="flex flex-col items-center gap-1 px-4 py-2" style={{ color: "#0d9488" }}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="text-xs font-medium">予測</span>
           </button>
-          <button className="flex flex-col items-center gap-1 px-6 py-2 text-muted-foreground hover:text-primary transition-colors">
-            <span className="text-xl">📊</span>
-            <span className="text-[10px] font-medium">履歴</span>
+          <button className="flex flex-col items-center gap-1 px-4 py-2" style={{ color: "#64748b" }}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs">履歴</span>
           </button>
-          <button className="flex flex-col items-center gap-1 px-6 py-2 text-muted-foreground hover:text-primary transition-colors">
-            <span className="text-xl">⚙️</span>
-            <span className="text-[10px] font-medium">設定</span>
+          <button className="flex flex-col items-center gap-1 px-4 py-2" style={{ color: "#64748b" }}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span className="text-xs">統計</span>
           </button>
         </div>
       </nav>
-
-      {/* モバイル: ボトムナビのスペーサー */}
-      <div className="h-20 lg:hidden" />
     </div>
   );
 }
