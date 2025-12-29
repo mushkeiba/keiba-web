@@ -49,75 +49,118 @@ interface Race {
   predictions: Prediction[];
 }
 
+// レース読み込み状態を含む型
+interface RaceWithLoading extends Race {
+  isLoading?: boolean;
+}
+
 export default function Home() {
   const [selectedTrack, setSelectedTrack] = useState(TRACKS[0]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [isLoading, setIsLoading] = useState(false);
-  const [races, setRaces] = useState<Race[]>([]);
+  const [races, setRaces] = useState<RaceWithLoading[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadingCount, setLoadingCount] = useState({ current: 0, total: 0 });
 
   const handlePredict = async () => {
     setIsLoading(true);
     setError(null);
     setRaces([]);
+    setLoadingCount({ current: 0, total: 0 });
 
     try {
-      const response = await fetch(`${API_URL}/api/predict`, {
+      // 1. レース一覧を取得
+      const listResponse = await fetch(`${API_URL}/api/races`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           track_code: selectedTrack.code,
           date: selectedDate,
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "予測に失敗しました");
+      if (!listResponse.ok) {
+        const errorData = await listResponse.json();
+        throw new Error(errorData.detail || "レース一覧の取得に失敗しました");
       }
 
-      const data = await response.json();
+      const listData = await listResponse.json();
+      const raceIds: string[] = listData.race_ids;
 
-      // APIレスポンスをフロントエンド用に変換
-      const formattedRaces: Race[] = data.races.map((race: {
-        id: string;
-        name: string;
-        distance: number;
-        time: string;
-        predictions: Array<{
-          rank: number;
-          number: number;
-          name: string;
-          jockey: string;
-          prob: number;
-          win_rate: number;
-          show_rate: number;
-          odds: number;
-          expected_value: number;
-          is_value: boolean;
-        }>;
-      }) => ({
-        id: race.id,
-        name: race.name,
-        distance: race.distance,
-        time: race.time,
-        predictions: race.predictions.map((pred) => ({
-          rank: pred.rank,
-          number: pred.number,
-          name: pred.name,
-          jockey: pred.jockey,
-          prob: pred.prob,
-          winRate: pred.win_rate,
-          showRate: pred.show_rate,
-          odds: pred.odds,
-          expectedValue: pred.expected_value,
-          isValue: pred.is_value,
-        })),
+      if (raceIds.length === 0) {
+        setError("レースが見つかりません");
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. プレースホルダーを作成（ローディング状態）
+      const placeholders: RaceWithLoading[] = raceIds.map((rid) => ({
+        id: rid.slice(-2),
+        name: `${rid.slice(-2)}R 読み込み中...`,
+        distance: 0,
+        time: "",
+        predictions: [],
+        isLoading: true,
       }));
+      setRaces(placeholders);
+      setLoadingCount({ current: 0, total: raceIds.length });
 
-      setRaces(formattedRaces);
+      // 3. 各レースを順次読み込み
+      for (let i = 0; i < raceIds.length; i++) {
+        const rid = raceIds[i];
+        try {
+          const raceResponse = await fetch(`${API_URL}/api/predict/race`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              race_id: rid,
+              track_code: selectedTrack.code,
+            }),
+          });
+
+          if (raceResponse.ok) {
+            const raceData = await raceResponse.json();
+            const formattedRace: RaceWithLoading = {
+              id: raceData.id,
+              name: raceData.name,
+              distance: raceData.distance,
+              time: raceData.time,
+              predictions: raceData.predictions.map((pred: {
+                rank: number;
+                number: number;
+                name: string;
+                jockey: string;
+                prob: number;
+                win_rate: number;
+                show_rate: number;
+                odds: number;
+                expected_value: number;
+                is_value: boolean;
+              }) => ({
+                rank: pred.rank,
+                number: pred.number,
+                name: pred.name,
+                jockey: pred.jockey,
+                prob: pred.prob,
+                winRate: pred.win_rate,
+                showRate: pred.show_rate,
+                odds: pred.odds,
+                expectedValue: pred.expected_value,
+                isValue: pred.is_value,
+              })),
+              isLoading: false,
+            };
+
+            // 該当レースを更新
+            setRaces((prev) =>
+              prev.map((r) => (r.id === formattedRace.id ? formattedRace : r))
+            );
+          }
+        } catch {
+          // 個別レースのエラーは無視して続行
+        }
+        setLoadingCount({ current: i + 1, total: raceIds.length });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
     } finally {
@@ -316,29 +359,23 @@ export default function Home() {
                   })}
                 </p>
               </div>
-              <Badge variant="outline" className="border-primary/50 text-primary px-4 py-1">
-                {races.length} レース
-              </Badge>
+              <div className="flex items-center gap-3">
+                {loadingCount.total > 0 && loadingCount.current < loadingCount.total && (
+                  <span className="text-sm text-muted-foreground">
+                    {loadingCount.current}/{loadingCount.total} 読み込み中...
+                  </span>
+                )}
+                <Badge variant="outline" className="border-primary/50 text-primary px-4 py-1">
+                  {races.length} レース
+                </Badge>
+              </div>
             </div>
           </div>
 
           {/* レース一覧 */}
           <div className="p-4 lg:p-8">
             <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-              {isLoading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <div className="p-4 space-y-4">
-                      <Skeleton className="h-6 w-32" />
-                      <div className="space-y-3">
-                        {Array.from({ length: 3 }).map((_, j) => (
-                          <Skeleton key={j} className="h-16 w-full rounded-xl" />
-                        ))}
-                      </div>
-                    </div>
-                  </Card>
-                ))
-              ) : races.length > 0 ? (
+              {races.length > 0 ? (
                 races.map((race) => (
                   <Card key={race.id} className="overflow-hidden bg-card/50 backdrop-blur border-border/50 hover:border-primary/30 transition-all">
                     {/* レースヘッダー */}
@@ -348,17 +385,25 @@ export default function Home() {
                           {race.id}R
                         </div>
                         <div>
-                          <h3 className="font-semibold">{race.name}</h3>
+                          <h3 className="font-semibold">{race.isLoading ? `${race.id}R 読み込み中...` : race.name}</h3>
                           <p className="text-xs text-muted-foreground">
-                            {race.distance}m • {race.time}発走
+                            {race.isLoading ? "予測中..." : `${race.distance}m • ${race.time}発走`}
                           </p>
                         </div>
                       </div>
+                      {race.isLoading && (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      )}
                     </div>
 
                     {/* 予測結果 */}
                     <div className="p-4 space-y-3">
-                      {race.predictions.map((pred) => {
+                      {race.isLoading ? (
+                        // ローディング中はスケルトン表示
+                        Array.from({ length: 3 }).map((_, j) => (
+                          <Skeleton key={j} className="h-16 w-full rounded-xl" />
+                        ))
+                      ) : race.predictions.map((pred) => {
                         const style = getRankStyle(pred.rank);
                         return (
                           <div
