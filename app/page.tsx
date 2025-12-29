@@ -34,8 +34,8 @@ interface Prediction {
   name: string;
   jockey: string;
   prob: number;
-  win_rate: number;
-  show_rate: number;
+  winRate: number;
+  showRate: number;
 }
 
 interface Race {
