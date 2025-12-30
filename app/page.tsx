@@ -1387,90 +1387,97 @@ export default function Home() {
               )}
 
               {/* 買い目リスト */}
-              <div className="divide-y divide-slate-100">
+              <div className="grid gap-2 p-4">
                 {autoBets.map((bet, idx) => (
                   <div
                     key={`${bet.raceId}-${bet.number}`}
-                    className="px-5 py-3 flex items-center gap-4"
+                    className="flex items-center gap-3 px-4 py-3"
                     style={{
                       background: bet.isFinished
                         ? bet.result && bet.result <= 3
-                          ? "rgba(34, 197, 94, 0.08)"
-                          : "rgba(239, 68, 68, 0.05)"
-                        : undefined,
+                          ? "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
+                          : "#fef2f2"
+                        : "#f8fafc",
+                      borderRadius: "12px",
+                      border: bet.isFinished && bet.result && bet.result <= 3
+                        ? "1px solid #86efac"
+                        : "1px solid #e2e8f0",
                     }}
                   >
-                    {/* レース */}
-                    <div className="w-12 shrink-0">
-                      <span
-                        className="text-sm font-bold"
-                        style={{ color: bet.isFinished ? "#64748b" : "#0d9488" }}
-                      >
-                        {bet.raceId}R
-                      </span>
-                      {bet.raceTime && !bet.isFinished && (
-                        <p className="text-xs" style={{ color: "#94a3b8" }}>{bet.raceTime}</p>
-                      )}
+                    {/* レース番号 */}
+                    <div
+                      className="w-10 h-10 flex items-center justify-center font-bold shrink-0"
+                      style={{
+                        background: bet.isFinished ? "#e2e8f0" : "#fff",
+                        borderRadius: "8px",
+                        color: "#475569",
+                        fontSize: "13px",
+                      }}
+                    >
+                      {bet.raceId}R
                     </div>
 
                     {/* 馬番 */}
                     <div
-                      className="w-8 h-8 flex items-center justify-center text-white text-sm font-bold shrink-0"
+                      className="w-9 h-9 flex items-center justify-center text-white font-bold shrink-0"
                       style={{
                         borderRadius: "50%",
                         background: bet.isFinished
-                          ? bet.result && bet.result <= 3 ? "#22c55e" : "#94a3b8"
+                          ? bet.result && bet.result <= 3 ? "#22c55e" : "#9ca3af"
                           : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                        fontSize: "15px",
                       }}
                     >
                       {bet.number}
                     </div>
 
-                    {/* 馬名・騎手 */}
+                    {/* 馬名・タイプ・結果 */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm" style={{ color: "#1e293b" }}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold" style={{ color: "#1e293b", fontSize: "15px" }}>
                           {bet.name}
                         </span>
                         <span
-                          className="text-xs px-1.5 py-0.5 rounded font-medium"
+                          className="text-xs px-2 py-0.5 rounded-full font-bold"
                           style={{
-                            background: bet.type === "本命" ? "#fef3c7" : bet.type === "穴" ? "#fce7f3" : "#e0e7ff",
-                            color: bet.type === "本命" ? "#92400e" : bet.type === "穴" ? "#9d174d" : "#3730a3",
+                            background: bet.type === "本命" ? "#fef3c7" : bet.type === "穴" ? "#fce7f3" : "#dbeafe",
+                            color: bet.type === "本命" ? "#92400e" : bet.type === "穴" ? "#be185d" : "#1e40af",
                           }}
                         >
                           {bet.type}
                         </span>
                         {bet.isFinished && bet.result && (
                           <span
-                            className="text-xs px-1.5 py-0.5 rounded font-bold"
+                            className="text-xs px-2 py-0.5 rounded-full font-bold"
                             style={{
-                              background: bet.result <= 3 ? "#dcfce7" : "#fee2e2",
-                              color: bet.result <= 3 ? "#166534" : "#dc2626",
+                              background: bet.result <= 3 ? "#22c55e" : "#ef4444",
+                              color: "#fff",
                             }}
                           >
-                            {bet.result <= 3 ? `${bet.result}着 ✓` : `${bet.result}着`}
+                            {bet.result}着{bet.result <= 3 && " ✓"}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs" style={{ color: "#94a3b8" }}>{bet.jockey}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "#64748b" }}>
+                        {bet.jockey} ・ 確信度 {bet.prob.toFixed(0)}%
+                      </p>
                     </div>
 
-                    {/* オッズ・EV */}
+                    {/* 複勝オッズ・EV・金額 */}
                     <div className="text-right shrink-0">
-                      <div className="flex items-center gap-2 justify-end">
-                        <span className="text-xs" style={{ color: "#64748b" }}>
-                          複{bet.placeOddsMin.toFixed(1)}-{bet.placeOddsMax.toFixed(1)}
-                        </span>
+                      <div className="flex items-center gap-1.5 justify-end">
                         <span
-                          className="text-sm font-bold"
-                          style={{ color: bet.ev >= 2.0 ? "#059669" : "#0d9488" }}
+                          className="text-lg font-bold"
+                          style={{ color: bet.ev >= 3.0 ? "#059669" : bet.ev >= 2.0 ? "#0d9488" : "#475569" }}
                         >
-                          EV {bet.ev.toFixed(2)}
+                          {bet.ev.toFixed(2)}
                         </span>
                       </div>
-                      <p className="text-xs" style={{ color: "#94a3b8" }}>
-                        {bet.prob.toFixed(0)}% → ¥{bet.betAmount}
+                      <p className="text-xs" style={{ color: "#64748b" }}>
+                        複{bet.placeOddsMin.toFixed(1)}-{bet.placeOddsMax.toFixed(1)}倍
+                      </p>
+                      <p className="text-xs font-medium" style={{ color: "#f59e0b" }}>
+                        ¥{bet.betAmount}
                       </p>
                     </div>
                   </div>
@@ -1478,19 +1485,20 @@ export default function Home() {
               </div>
 
               {/* フッター */}
-              {pendingBets.length > 0 && (
-                <div
-                  className="px-5 py-3 flex items-center justify-between"
-                  style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}
-                >
-                  <p className="text-sm" style={{ color: "#64748b" }}>
-                    未確定: {pendingBets.length}点 / ¥{pendingBets.reduce((s, b) => s + b.betAmount, 0).toLocaleString()}
-                  </p>
-                  <p className="text-xs" style={{ color: "#94a3b8" }}>
-                    ※ 複勝で購入推奨
-                  </p>
+              <div
+                className="px-4 py-3 flex items-center justify-between"
+                style={{ background: "#fffbeb", borderTop: "1px solid #fde68a" }}
+              >
+                <div className="flex items-center gap-2">
+                  <span style={{ fontSize: "16px" }}>💡</span>
+                  <span className="text-sm font-medium" style={{ color: "#92400e" }}>
+                    すべて複勝で購入
+                  </span>
                 </div>
-              )}
+                <span className="text-xs" style={{ color: "#a16207" }}>
+                  EVは複勝オッズで計算
+                </span>
+              </div>
             </div>
           );
         })()}
