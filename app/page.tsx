@@ -75,6 +75,25 @@ interface DailyStats {
   roi: number;
 }
 
+// おすすめ賭け方を判定
+function getBetRecommendation(predictions: Prediction[]): { type: string; reason: string } {
+  if (predictions.length < 2) return { type: "様子見", reason: "データ不足" };
+
+  const prob1 = predictions[0].prob;
+  const prob2 = predictions[1].prob;
+  const prob3 = predictions[2]?.prob || 0;
+  const diff12 = (prob1 - prob2) * 100; // 1位と2位の差（%）
+  const diff13 = (prob1 - prob3) * 100; // 1位と3位の差（%）
+
+  if (prob1 >= 0.5 && diff12 >= 15) {
+    return { type: "単勝", reason: "本命が強い" };
+  } else if (diff13 <= 20) {
+    return { type: "複勝", reason: "混戦" };
+  } else {
+    return { type: "複勝", reason: "安定狙い" };
+  }
+}
+
 // 成績計算関数
 function calculateStats(races: RaceWithLoading[]): DailyStats | null {
   const finishedRaces = races.filter((r) => r.result && r.result.length > 0);
@@ -339,7 +358,7 @@ function RaceModal({
           <div className="flex items-center gap-4 text-sm" style={{ color: "#64748b" }}>
             <div className="flex items-center gap-1">
               <span style={{ fontSize: "14px" }}>🔥</span>
-              <span>= 期待値 &gt; 1.5（狙い目）</span>
+              <span>= 期待値 &gt; 2.5（厳選）</span>
             </div>
           </div>
           <button
@@ -460,7 +479,7 @@ export default function Home() {
                         ...pred,
                         odds,
                         expectedValue,
-                        isValue: expectedValue > 1.5,
+                        isValue: expectedValue > 2.5,
                       };
                     }),
                   };
@@ -832,6 +851,21 @@ export default function Home() {
                             確定
                           </span>
                         )}
+                        {!race.result && race.predictions.length > 0 && (() => {
+                          const rec = getBetRecommendation(race.predictions);
+                          return (
+                            <span
+                              className="text-xs px-2 py-0.5 font-medium"
+                              style={{
+                                background: rec.type === "単勝" ? "#fbbf24" : "#60a5fa",
+                                color: rec.type === "単勝" ? "#1e293b" : "#1e293b",
+                                borderRadius: "4px",
+                              }}
+                            >
+                              {rec.type}
+                            </span>
+                          );
+                        })()}
                       </>
                     )}
                   </div>
