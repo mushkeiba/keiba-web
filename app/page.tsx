@@ -653,6 +653,45 @@ export default function Home() {
 
   const currentTrack = TRACKS.find((t) => t.code === selectedTrack);
 
+  // キャッシュ関数
+  const getCacheKey = (date: string, track: string) => `keiba_${date}_${track}`;
+
+  const getCache = (date: string, track: string): RaceWithLoading[] | null => {
+    try {
+      const key = getCacheKey(date, track);
+      const cached = localStorage.getItem(key);
+      if (!cached) return null;
+
+      const { data, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      const today = new Date().toISOString().split("T")[0];
+
+      // 当日のデータは5分キャッシュ、過去データは24時間キャッシュ
+      const maxAge = date === today ? 5 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
+      if (now - timestamp > maxAge) {
+        localStorage.removeItem(key);
+        return null;
+      }
+
+      return data;
+    } catch {
+      return null;
+    }
+  };
+
+  const setCache = (date: string, track: string, data: RaceWithLoading[]) => {
+    try {
+      const key = getCacheKey(date, track);
+      localStorage.setItem(key, JSON.stringify({
+        data,
+        timestamp: Date.now(),
+      }));
+    } catch {
+      // localStorage full or unavailable
+    }
+  };
+
   // 分析実行関数
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
@@ -697,6 +736,13 @@ export default function Home() {
     }
   };
 
+  // レースデータが更新されたらキャッシュに保存
+  useEffect(() => {
+    if (races.length > 0 && !isLoading && !races.some(r => r.isLoading)) {
+      setCache(selectedDate, selectedTrack, races);
+    }
+  }, [races, isLoading, selectedDate, selectedTrack]);
+
   // モデル情報を取得
   useEffect(() => {
     const fetchModelInfo = async () => {
@@ -719,6 +765,14 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     setRaces([]);
+
+    // キャッシュチェック
+    const cached = getCache(selectedDate, selectedTrack);
+    if (cached && cached.length > 0) {
+      setRaces(cached);
+      setIsLoading(false);
+      return;
+    }
 
     try {
       // 1. まず事前計算済み予測を取得してみる（高速）
@@ -845,11 +899,32 @@ export default function Home() {
 
             if (raceResponse.ok) {
               const raceData = await raceResponse.json();
+
+              // 結果も取得（終了したレース用）
+              let raceResult: RaceResult[] | null = null;
+              try {
+                const oddsResponse = await fetch(`${API_URL}/api/odds`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    race_id: rid,
+                    track_code: selectedTrack,
+                  }),
+                });
+                if (oddsResponse.ok) {
+                  const oddsData = await oddsResponse.json();
+                  raceResult = oddsData.result;
+                }
+              } catch {
+                // skip
+              }
+
               const formattedRace: RaceWithLoading = {
                 id: raceData.id,
                 name: raceData.name || "",
                 distance: raceData.distance,
                 time: raceData.time || "",
+                result: raceResult,
                 predictions: raceData.predictions.map(
                   (pred: {
                     rank: number;
