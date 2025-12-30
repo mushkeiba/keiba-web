@@ -273,20 +273,20 @@ function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
       race.result.forEach(r => resultMap.set(r.number, r.rank));
     }
 
-    for (const pred of race.predictions.slice(0, 5)) { // 上位5頭まで検討
+    for (const pred of race.predictions.slice(0, 3)) { // 上位3頭まで検討
       const prob = pred.prob * 100;
       const ev = pred.expectedValue;
       const placeOddsAvg = pred.placeOdds || 0;
 
-      // 条件: EV >= 1.5 かつ 確信度 >= 50%（厳選版）
-      if (ev >= 1.5 && prob >= 50) {
+      // 条件: EV >= 2.0 かつ 確信度 >= 35%（回収率重視版）
+      if (ev >= 2.0 && prob >= 35) {
         let betType: "本命" | "対抗" | "穴" = "対抗";
         let betAmount = 500;
 
-        if (prob >= 65 && ev >= 2.0) {
+        if (prob >= 60 && ev >= 2.5) {
           betType = "本命";
           betAmount = 500;
-        } else if (prob < 55 || ev >= 4.0) {
+        } else if (prob < 45 || ev >= 5.0) {
           betType = "穴";
           betAmount = 300;
         }
@@ -1343,7 +1343,7 @@ export default function Home() {
                     <span style={{ fontSize: "24px" }}>🎯</span>
                     <div>
                       <h3 className="font-bold text-lg">今日の買い目</h3>
-                      <p className="text-sm opacity-90">EV≥1.5 & 確信度≥50% を厳選</p>
+                      <p className="text-sm opacity-90">EV≥2.0 & AI上位3頭（回収率重視）</p>
                     </div>
                   </div>
                   <div className="text-right">
