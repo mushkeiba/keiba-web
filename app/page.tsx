@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -44,6 +44,18 @@ interface Race {
 
 interface RaceWithLoading extends Race {
   isLoading?: boolean;
+}
+
+interface ModelInfo {
+  track_name: string;
+  trained_at: string;
+  data_count: number;
+  race_count: number;
+  date_range: {
+    from: string;
+    to: string;
+  };
+  auc: number;
 }
 
 // モーダルコンポーネント
@@ -257,8 +269,27 @@ export default function Home() {
   const [races, setRaces] = useState<RaceWithLoading[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedRace, setSelectedRace] = useState<RaceWithLoading | null>(null);
+  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
 
   const currentTrack = TRACKS.find((t) => t.code === selectedTrack);
+
+  // モデル情報を取得
+  useEffect(() => {
+    const fetchModelInfo = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/models/${selectedTrack}`);
+        if (response.ok) {
+          const data = await response.json();
+          setModelInfo(data);
+        } else {
+          setModelInfo(null);
+        }
+      } catch {
+        setModelInfo(null);
+      }
+    };
+    fetchModelInfo();
+  }, [selectedTrack]);
 
   const handlePredict = async () => {
     setIsLoading(true);
@@ -538,6 +569,39 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {/* モデル情報 */}
+            {modelInfo && (
+              <div
+                className="mt-4 pt-4 flex flex-wrap gap-4 text-sm"
+                style={{ borderTop: "1px solid #e2e8f0", color: "#64748b" }}
+              >
+                <div className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <span>学習データ: <strong style={{ color: "#0d9488" }}>{modelInfo.data_count.toLocaleString()}件</strong></span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>期間: {modelInfo.date_range.from} 〜 {modelInfo.date_range.to}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>精度(AUC): <strong style={{ color: "#0d9488" }}>{(modelInfo.auc * 100).toFixed(1)}%</strong></span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>最終学習: {modelInfo.trained_at.split(" ")[0]}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
