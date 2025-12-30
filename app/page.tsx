@@ -240,6 +240,83 @@ function getDetailedBetRecommendations(predictions: Prediction[]): BetRecommenda
   return recs;
 }
 
+// 買い目推奨の型定義
+interface AutoBet {
+  raceId: string;
+  raceName: string;
+  raceTime: string;
+  number: number;
+  name: string;
+  jockey: string;
+  prob: number;
+  odds: number;
+  placeOddsMin: number;
+  placeOddsMax: number;
+  placeOddsAvg: number;
+  ev: number;
+  betAmount: number;
+  type: "本命" | "対抗" | "穴";
+  isFinished: boolean;
+  result?: number; // 着順
+}
+
+// 自動買い目を計算
+function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
+  const bets: AutoBet[] = [];
+
+  for (const race of races) {
+    if (race.isLoading || race.predictions.length === 0) continue;
+
+    const isFinished = race.result && race.result.length > 0;
+    const resultMap = new Map<number, number>();
+    if (race.result) {
+      race.result.forEach(r => resultMap.set(r.number, r.rank));
+    }
+
+    for (const pred of race.predictions.slice(0, 5)) { // 上位5頭まで検討
+      const prob = pred.prob * 100;
+      const ev = pred.expectedValue;
+      const placeOddsAvg = pred.placeOdds || 0;
+
+      // 条件: EV >= 1.0 かつ 確信度 >= 35%
+      if (ev >= 1.0 && prob >= 35) {
+        let betType: "本命" | "対抗" | "穴" = "対抗";
+        let betAmount = 500;
+
+        if (prob >= 60 && ev >= 1.5) {
+          betType = "本命";
+          betAmount = 500;
+        } else if (prob < 45 || ev >= 3.0) {
+          betType = "穴";
+          betAmount = 300;
+        }
+
+        bets.push({
+          raceId: race.id,
+          raceName: race.name || `${race.id}R`,
+          raceTime: race.time || "",
+          number: pred.number,
+          name: pred.name,
+          jockey: pred.jockey,
+          prob: prob,
+          odds: pred.odds,
+          placeOddsMin: pred.placeOddsMin,
+          placeOddsMax: pred.placeOddsMax,
+          placeOddsAvg: placeOddsAvg,
+          ev: ev,
+          betAmount: betAmount,
+          type: betType,
+          isFinished: !!isFinished,
+          result: resultMap.get(pred.number),
+        });
+      }
+    }
+  }
+
+  // EVの高い順にソート
+  return bets.sort((a, b) => b.ev - a.ev);
+}
+
 // 成績計算関数
 function calculateStats(races: RaceWithLoading[]): DailyStats | null {
   const finishedRaces = races.filter((r) => r.result && r.result.length > 0);
@@ -1228,6 +1305,192 @@ export default function Home() {
                   </p>
                 </div>
               </div>
+            </div>
+          );
+        })()}
+
+        {/* 今日の買い目セクション */}
+        {races.length > 0 && !races.some(r => r.isLoading) && (() => {
+          const autoBets = calculateAutoBets(races);
+          if (autoBets.length === 0) return null;
+
+          const totalBet = autoBets.reduce((sum, b) => sum + b.betAmount, 0);
+          const finishedBets = autoBets.filter(b => b.isFinished);
+          const hitBets = finishedBets.filter(b => b.result && b.result <= 3);
+          const totalPayout = hitBets.reduce((sum, b) => {
+            // 複勝的中時は平均オッズで計算
+            const avgOdds = (b.placeOddsMin + b.placeOddsMax) / 2;
+            return sum + Math.round(b.betAmount * avgOdds);
+          }, 0);
+          const pendingBets = autoBets.filter(b => !b.isFinished);
+
+          return (
+            <div
+              className="mb-6 overflow-hidden"
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+              }}
+            >
+              {/* ヘッダー */}
+              <div
+                className="px-5 py-4 text-white"
+                style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span style={{ fontSize: "24px" }}>🎯</span>
+                    <div>
+                      <h3 className="font-bold text-lg">今日の買い目</h3>
+                      <p className="text-sm opacity-90">EV≥1.0 & 確信度≥35% を自動抽出</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold">{autoBets.length}点</p>
+                    <p className="text-sm opacity-90">合計 ¥{totalBet.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 成績サマリー（確定レースがある場合） */}
+              {finishedBets.length > 0 && (
+                <div
+                  className="px-5 py-3 flex items-center justify-between"
+                  style={{
+                    background: totalPayout >= finishedBets.reduce((s, b) => s + b.betAmount, 0)
+                      ? "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
+                      : "linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)",
+                    borderBottom: "1px solid #e2e8f0",
+                  }}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium" style={{ color: "#64748b" }}>
+                      確定分: {hitBets.length}/{finishedBets.length}的中
+                    </span>
+                    <span className="text-sm" style={{ color: "#64748b" }}>
+                      投資 ¥{finishedBets.reduce((s, b) => s + b.betAmount, 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm" style={{ color: "#64748b" }}>払戻</span>
+                    <span
+                      className="text-lg font-bold"
+                      style={{
+                        color: totalPayout >= finishedBets.reduce((s, b) => s + b.betAmount, 0) ? "#059669" : "#dc2626"
+                      }}
+                    >
+                      ¥{totalPayout.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 買い目リスト */}
+              <div className="divide-y divide-slate-100">
+                {autoBets.map((bet, idx) => (
+                  <div
+                    key={`${bet.raceId}-${bet.number}`}
+                    className="px-5 py-3 flex items-center gap-4"
+                    style={{
+                      background: bet.isFinished
+                        ? bet.result && bet.result <= 3
+                          ? "rgba(34, 197, 94, 0.08)"
+                          : "rgba(239, 68, 68, 0.05)"
+                        : undefined,
+                    }}
+                  >
+                    {/* レース */}
+                    <div className="w-12 shrink-0">
+                      <span
+                        className="text-sm font-bold"
+                        style={{ color: bet.isFinished ? "#64748b" : "#0d9488" }}
+                      >
+                        {bet.raceId}R
+                      </span>
+                      {bet.raceTime && !bet.isFinished && (
+                        <p className="text-xs" style={{ color: "#94a3b8" }}>{bet.raceTime}</p>
+                      )}
+                    </div>
+
+                    {/* 馬番 */}
+                    <div
+                      className="w-8 h-8 flex items-center justify-center text-white text-sm font-bold shrink-0"
+                      style={{
+                        borderRadius: "50%",
+                        background: bet.isFinished
+                          ? bet.result && bet.result <= 3 ? "#22c55e" : "#94a3b8"
+                          : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                      }}
+                    >
+                      {bet.number}
+                    </div>
+
+                    {/* 馬名・騎手 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm" style={{ color: "#1e293b" }}>
+                          {bet.name}
+                        </span>
+                        <span
+                          className="text-xs px-1.5 py-0.5 rounded font-medium"
+                          style={{
+                            background: bet.type === "本命" ? "#fef3c7" : bet.type === "穴" ? "#fce7f3" : "#e0e7ff",
+                            color: bet.type === "本命" ? "#92400e" : bet.type === "穴" ? "#9d174d" : "#3730a3",
+                          }}
+                        >
+                          {bet.type}
+                        </span>
+                        {bet.isFinished && bet.result && (
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded font-bold"
+                            style={{
+                              background: bet.result <= 3 ? "#dcfce7" : "#fee2e2",
+                              color: bet.result <= 3 ? "#166534" : "#dc2626",
+                            }}
+                          >
+                            {bet.result <= 3 ? `${bet.result}着 ✓` : `${bet.result}着`}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs" style={{ color: "#94a3b8" }}>{bet.jockey}</p>
+                    </div>
+
+                    {/* オッズ・EV */}
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-2 justify-end">
+                        <span className="text-xs" style={{ color: "#64748b" }}>
+                          複{bet.placeOddsMin.toFixed(1)}-{bet.placeOddsMax.toFixed(1)}
+                        </span>
+                        <span
+                          className="text-sm font-bold"
+                          style={{ color: bet.ev >= 2.0 ? "#059669" : "#0d9488" }}
+                        >
+                          EV {bet.ev.toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="text-xs" style={{ color: "#94a3b8" }}>
+                        {bet.prob.toFixed(0)}% → ¥{bet.betAmount}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* フッター */}
+              {pendingBets.length > 0 && (
+                <div
+                  className="px-5 py-3 flex items-center justify-between"
+                  style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}
+                >
+                  <p className="text-sm" style={{ color: "#64748b" }}>
+                    未確定: {pendingBets.length}点 / ¥{pendingBets.reduce((s, b) => s + b.betAmount, 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs" style={{ color: "#94a3b8" }}>
+                    ※ 複勝で購入推奨
+                  </p>
+                </div>
+              )}
             </div>
           );
         })()}
