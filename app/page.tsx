@@ -848,7 +848,8 @@ export default function Home() {
 
             if (oddsResponse.ok) {
               const oddsData = await oddsResponse.json();
-              const oddsDict: Record<number, number> = oddsData.odds;
+              const oddsDict: Record<number, number> = oddsData.odds || {};
+              const placeOddsDict: Record<number, { min: number; max: number; avg: number }> = oddsData.place_odds || {};
               const raceResult: RaceResult[] | null = oddsData.result;
 
               setRaces((prev) =>
@@ -859,10 +860,20 @@ export default function Home() {
                     result: raceResult,
                     predictions: r.predictions.map((pred) => {
                       const odds = oddsDict[pred.number] || 0;
-                      const expectedValue = pred.prob * odds;
+                      const placeOdds = placeOddsDict[pred.number];
+                      const placeOddsAvg = placeOdds?.avg || 0;
+                      const placeOddsMin = placeOdds?.min || 0;
+                      const placeOddsMax = placeOdds?.max || 0;
+                      // 期待値は複勝オッズベース（なければ単勝/3で概算）
+                      const expectedValue = placeOddsAvg > 0
+                        ? pred.prob * placeOddsAvg
+                        : odds > 0 ? pred.prob * (odds / 3) : 0;
                       return {
                         ...pred,
                         odds,
+                        placeOdds: placeOddsAvg,
+                        placeOddsMin,
+                        placeOddsMax,
                         expectedValue,
                         isValue: expectedValue > 2.5,
                       };
