@@ -374,7 +374,7 @@ function RaceModal({
               <span className="w-8 text-center">馬番</span>
               <span className="flex-1">馬名</span>
               <span className="w-14 text-center">人気</span>
-              <span className="w-20 text-center">複勝オッズ</span>
+              <span className="w-28 text-center">オッズ</span>
               <span className="w-12 text-right">期待値</span>
               <span className="w-12 text-right">AI予測</span>
             </div>
@@ -493,24 +493,25 @@ function RaceModal({
                     )}
                   </div>
 
-                  {/* 複勝オッズ */}
-                  <div className="w-20 text-center shrink-0">
-                    {pred.placeOdds > 0 ? (
-                      <span
-                        className="text-xs font-medium"
-                        style={{
-                          color: pred.placeOdds >= 2 ? "#92400e" : "#64748b",
-                        }}
-                      >
-                        {pred.placeOddsMin.toFixed(1)}-{pred.placeOddsMax.toFixed(1)}倍
-                      </span>
-                    ) : pred.odds > 0 ? (
-                      <span className="text-xs" style={{ color: "#94a3b8" }}>
-                        (単{pred.odds.toFixed(1)}倍)
-                      </span>
-                    ) : (
-                      <span style={{ color: "#cbd5e1" }}>-</span>
-                    )}
+                  {/* オッズ（単勝/複勝） */}
+                  <div className="w-28 text-center shrink-0">
+                    <div className="flex flex-col items-center gap-0.5">
+                      {pred.odds > 0 && (
+                        <span className="text-xs" style={{ color: "#64748b" }}>
+                          単{pred.odds.toFixed(1)}倍
+                        </span>
+                      )}
+                      {pred.placeOdds > 0 ? (
+                        <span
+                          className="text-xs font-medium"
+                          style={{ color: pred.placeOdds >= 2 ? "#1e40af" : "#64748b" }}
+                        >
+                          複{pred.placeOddsMin.toFixed(1)}-{pred.placeOddsMax.toFixed(1)}倍
+                        </span>
+                      ) : pred.odds === 0 && (
+                        <span style={{ color: "#cbd5e1" }}>-</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* 期待値 */}
@@ -1453,22 +1454,24 @@ export default function Home() {
                                 {popularity}番人気
                               </span>
                             )}
-                            {/* 複勝オッズ（メイン表示） */}
-                            {pred.placeOdds > 0 ? (
+                            {/* 単勝オッズ */}
+                            {pred.odds > 0 && (
+                              <span className="text-xs" style={{ color: "#64748b" }}>
+                                単{pred.odds.toFixed(1)}倍
+                              </span>
+                            )}
+                            {/* 複勝オッズ */}
+                            {pred.placeOdds > 0 && (
                               <span
                                 className="text-xs font-medium px-1.5 py-0.5 rounded"
                                 style={{
-                                  background: pred.placeOdds >= 2 ? "#fef3c7" : "#f1f5f9",
-                                  color: pred.placeOdds >= 2 ? "#92400e" : "#64748b",
+                                  background: pred.placeOdds >= 2 ? "#dbeafe" : "#f1f5f9",
+                                  color: pred.placeOdds >= 2 ? "#1e40af" : "#64748b",
                                 }}
                               >
                                 複{pred.placeOddsMin.toFixed(1)}-{pred.placeOddsMax.toFixed(1)}倍
                               </span>
-                            ) : pred.odds > 0 ? (
-                              <span className="text-xs" style={{ color: "#94a3b8" }}>
-                                単{pred.odds.toFixed(1)}倍
-                              </span>
-                            ) : null}
+                            )}
                             {/* 期待値表示 */}
                             {pred.expectedValue > 0 && (
                               <span
