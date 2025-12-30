@@ -34,12 +34,18 @@ interface Prediction {
   isValue: boolean;
 }
 
+interface RaceResult {
+  rank: number;
+  number: number;
+}
+
 interface Race {
   id: string;
   name: string;
   distance: number;
   time: string;
   predictions: Prediction[];
+  result?: RaceResult[] | null;
 }
 
 interface RaceWithLoading extends Race {
@@ -66,6 +72,14 @@ function RaceModal({
   race: RaceWithLoading;
   onClose: () => void;
 }) {
+  // 馬番 -> 着順のマップを作成
+  const resultMap = new Map<number, number>();
+  if (race.result) {
+    race.result.forEach((r) => {
+      resultMap.set(r.number, r.rank);
+    });
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -85,19 +99,29 @@ function RaceModal({
         <div
           className="px-6 py-4 text-white flex items-center justify-between"
           style={{
-            background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+            background: race.result
+              ? "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)"
+              : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
           }}
         >
           <div>
             <div className="flex items-center gap-3">
               <span className="text-2xl font-bold">{race.id}R</span>
               <span className="text-white/80">{race.distance}m</span>
-              {race.time && (
+              {race.time && !race.result && (
                 <span
                   className="px-2 py-1 text-xs font-medium"
                   style={{ background: "rgba(255,255,255,0.2)", borderRadius: "6px" }}
                 >
                   {race.time}
+                </span>
+              )}
+              {race.result && (
+                <span
+                  className="px-2 py-1 text-xs font-medium"
+                  style={{ background: "rgba(255,255,255,0.25)", borderRadius: "6px" }}
+                >
+                  確定
                 </span>
               )}
             </div>
@@ -184,6 +208,23 @@ function RaceModal({
                   <p className="font-semibold truncate" style={{ color: "#1e293b" }}>
                     {pred.name}
                   </p>
+                  {resultMap.has(pred.number) && (
+                    <span
+                      className="px-1.5 py-0.5 text-xs font-bold"
+                      style={{
+                        background:
+                          resultMap.get(pred.number) === 1
+                            ? "#fbbf24"
+                            : resultMap.get(pred.number) === 2
+                            ? "#9ca3af"
+                            : "#f97316",
+                        color: "#1e293b",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      {resultMap.get(pred.number)}着
+                    </span>
+                  )}
                   {pred.isValue && (
                     <span style={{ fontSize: "16px" }}>🔥</span>
                   )}
@@ -346,12 +387,14 @@ export default function Home() {
             if (oddsResponse.ok) {
               const oddsData = await oddsResponse.json();
               const oddsDict: Record<number, number> = oddsData.odds;
+              const raceResult: RaceResult[] | null = oddsData.result;
 
               setRaces((prev) =>
                 prev.map((r) => {
                   if (r.id !== race.id) return r;
                   return {
                     ...r,
+                    result: raceResult,
                     predictions: r.predictions.map((pred) => {
                       const odds = oddsDict[pred.number] || 0;
                       const expectedValue = pred.prob * odds;
@@ -651,14 +694,18 @@ export default function Home() {
                 {/* Race Header */}
                 <div
                   className="px-4 py-3 text-white flex items-center justify-between"
-                  style={{ background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)" }}
+                  style={{
+                    background: race.result
+                      ? "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)"
+                      : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)"
+                  }}
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-lg">{race.id}R</span>
                     {!race.isLoading && (
                       <>
                         <span className="text-sm opacity-80">{race.distance}m</span>
-                        {race.time && (
+                        {race.time && !race.result && (
                           <span
                             className="text-xs px-2 py-0.5"
                             style={{ background: "rgba(255,255,255,0.2)", borderRadius: "4px" }}
@@ -666,12 +713,39 @@ export default function Home() {
                             {race.time}
                           </span>
                         )}
+                        {race.result && (
+                          <span
+                            className="text-xs px-2 py-0.5 font-medium"
+                            style={{ background: "rgba(255,255,255,0.25)", borderRadius: "4px" }}
+                          >
+                            確定
+                          </span>
+                        )}
                       </>
                     )}
                   </div>
-                  <svg className="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  {race.result ? (
+                    <div className="flex items-center gap-1 text-sm font-bold">
+                      {race.result.map((r, i) => (
+                        <span
+                          key={r.number}
+                          className="w-6 h-6 flex items-center justify-center"
+                          style={{
+                            background: i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : "#f97316",
+                            borderRadius: "50%",
+                            color: "#1e293b",
+                            fontSize: "12px",
+                          }}
+                        >
+                          {r.number}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <svg className="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
                 </div>
 
                 {/* Predictions */}
