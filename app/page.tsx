@@ -363,134 +363,157 @@ function RaceModal({
         <div className="flex-1 overflow-y-auto">
           {/* 凡例 */}
           <div
-            className="px-6 py-3 text-xs flex items-center gap-4"
+            className="px-4 py-2 text-xs grid gap-2"
             style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}
           >
-            <span style={{ color: "#64748b" }}>順位</span>
-            <span style={{ color: "#64748b" }}>馬番</span>
-            <span style={{ color: "#64748b" }} className="flex-1">馬名 / 騎手</span>
-            <span style={{ color: "#64748b", width: "60px", textAlign: "right" }}>オッズ</span>
-            <span style={{ color: "#64748b", width: "50px", textAlign: "right" }}>勝率</span>
-            <span style={{ color: "#64748b", width: "50px", textAlign: "right" }}>複勝</span>
-            <span style={{ color: "#64748b", width: "60px", textAlign: "right" }}>AI予測</span>
+            <div className="flex items-center gap-4" style={{ color: "#64748b" }}>
+              <span className="w-8 text-center">AI順</span>
+              <span className="w-8 text-center">馬番</span>
+              <span className="flex-1">馬名</span>
+              <span className="w-16 text-center">人気</span>
+              <span className="w-14 text-right">オッズ</span>
+              <span className="w-14 text-right">AI予測</span>
+            </div>
           </div>
 
-          {race.predictions.map((pred, index) => (
-            <div
-              key={pred.number}
-              className="px-6 py-4 flex items-center gap-4 transition-colors hover:bg-slate-50"
-              style={{
-                borderBottom: index < race.predictions.length - 1 ? "1px solid #f1f5f9" : "none",
-                background: pred.isValue ? "rgba(16, 185, 129, 0.05)" : undefined,
-              }}
-            >
-              {/* 順位 */}
+          {race.predictions.map((pred, index) => {
+            // 人気順を計算（オッズが低い順）
+            const sortedByOdds = [...race.predictions]
+              .filter(p => p.odds > 0)
+              .sort((a, b) => a.odds - b.odds);
+            const popularity = sortedByOdds.findIndex(p => p.number === pred.number) + 1;
+
+            // 確信度による色分け
+            const prob = pred.prob * 100;
+            const probColor = prob >= 70 ? "#059669" : prob >= 50 ? "#0d9488" : prob >= 30 ? "#475569" : "#94a3b8";
+
+            return (
               <div
-                className="w-8 h-8 flex items-center justify-center text-sm font-bold"
+                key={pred.number}
+                className="px-4 py-3 transition-colors hover:bg-slate-50"
                 style={{
-                  borderRadius: "8px",
-                  background:
-                    pred.rank === 1
-                      ? "linear-gradient(135deg, #fef3c7, #fde68a)"
-                      : pred.rank === 2
-                      ? "linear-gradient(135deg, #f1f5f9, #e2e8f0)"
-                      : pred.rank === 3
-                      ? "linear-gradient(135deg, #fed7aa, #fdba74)"
-                      : "#f1f5f9",
-                  color:
-                    pred.rank === 1
-                      ? "#92400e"
-                      : pred.rank === 2
-                      ? "#475569"
-                      : pred.rank === 3
-                      ? "#9a3412"
-                      : "#64748b",
+                  borderBottom: index < race.predictions.length - 1 ? "1px solid #f1f5f9" : "none",
+                  background: prob >= 70 ? "rgba(5, 150, 105, 0.05)" : pred.isValue ? "rgba(16, 185, 129, 0.03)" : undefined,
                 }}
               >
-                {pred.rank}
-              </div>
+                <div className="flex items-center gap-4">
+                  {/* AI順位 */}
+                  <div
+                    className="w-8 h-8 flex items-center justify-center text-sm font-bold shrink-0"
+                    style={{
+                      borderRadius: "8px",
+                      background:
+                        pred.rank === 1
+                          ? "linear-gradient(135deg, #fef3c7, #fde68a)"
+                          : pred.rank === 2
+                          ? "linear-gradient(135deg, #f1f5f9, #e2e8f0)"
+                          : pred.rank === 3
+                          ? "linear-gradient(135deg, #fed7aa, #fdba74)"
+                          : "#f1f5f9",
+                      color:
+                        pred.rank === 1
+                          ? "#92400e"
+                          : pred.rank === 2
+                          ? "#475569"
+                          : pred.rank === 3
+                          ? "#9a3412"
+                          : "#64748b",
+                    }}
+                  >
+                    {pred.rank}
+                  </div>
 
-              {/* 馬番 */}
-              <div
-                className="w-10 h-10 flex items-center justify-center text-white font-bold"
-                style={{
-                  borderRadius: "50%",
-                  background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
-                  boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
-                }}
-              >
-                {pred.number}
-              </div>
+                  {/* 馬番 */}
+                  <div
+                    className="w-8 h-8 flex items-center justify-center text-white text-sm font-bold shrink-0"
+                    style={{
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                      boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
+                    }}
+                  >
+                    {pred.number}
+                  </div>
 
-              {/* 馬名 / 騎手 */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold truncate" style={{ color: "#1e293b" }}>
-                    {pred.name}
-                  </p>
-                  {resultMap.has(pred.number) && (
+                  {/* 馬名 / 騎手 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold" style={{ color: "#1e293b" }}>
+                        {pred.name}
+                      </p>
+                      {resultMap.has(pred.number) && (
+                        <span
+                          className="px-1.5 py-0.5 text-xs font-bold"
+                          style={{
+                            background:
+                              resultMap.get(pred.number) === 1
+                                ? "#fbbf24"
+                                : resultMap.get(pred.number) === 2
+                                ? "#9ca3af"
+                                : resultMap.get(pred.number)! <= 3
+                                ? "#f97316"
+                                : "#e2e8f0",
+                            color: resultMap.get(pred.number)! <= 3 ? "#1e293b" : "#64748b",
+                            borderRadius: "4px",
+                          }}
+                        >
+                          {resultMap.get(pred.number)}着
+                        </span>
+                      )}
+                      {pred.isValue && (
+                        <span style={{ fontSize: "14px" }}>🔥</span>
+                      )}
+                      {prob >= 70 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: "#dcfce7", color: "#166534" }}>
+                          おすすめ
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm" style={{ color: "#64748b" }}>
+                      {pred.jockey}
+                    </p>
+                  </div>
+
+                  {/* 人気 */}
+                  <div className="w-16 text-center shrink-0">
+                    {popularity > 0 && (
+                      <span
+                        className="text-xs px-2 py-1 rounded font-medium"
+                        style={{
+                          background: popularity === 1 ? "#fef3c7" : popularity <= 3 ? "#fef9c3" : "#f1f5f9",
+                          color: popularity <= 3 ? "#92400e" : "#64748b"
+                        }}
+                      >
+                        {popularity}番人気
+                      </span>
+                    )}
+                  </div>
+
+                  {/* オッズ */}
+                  <div className="w-14 text-right shrink-0">
                     <span
-                      className="px-1.5 py-0.5 text-xs font-bold"
+                      className="font-bold"
                       style={{
-                        background:
-                          resultMap.get(pred.number) === 1
-                            ? "#fbbf24"
-                            : resultMap.get(pred.number) === 2
-                            ? "#9ca3af"
-                            : "#f97316",
-                        color: "#1e293b",
-                        borderRadius: "4px",
+                        color: pred.odds < 5 ? "#dc2626" : pred.odds < 10 ? "#ea580c" : "#64748b",
                       }}
                     >
-                      {resultMap.get(pred.number)}着
+                      {pred.odds > 0 ? `${pred.odds.toFixed(1)}倍` : "-"}
                     </span>
-                  )}
-                  {pred.isValue && (
-                    <span style={{ fontSize: "16px" }}>🔥</span>
-                  )}
+                  </div>
+
+                  {/* AI予測 */}
+                  <div className="w-14 text-right shrink-0">
+                    <span
+                      className="text-lg font-bold"
+                      style={{ color: probColor, fontFamily: "monospace" }}
+                    >
+                      {prob.toFixed(0)}%
+                    </span>
+                  </div>
                 </div>
-                <p className="text-sm" style={{ color: "#64748b" }}>
-                  {pred.jockey}
-                </p>
               </div>
-
-              {/* オッズ */}
-              <div style={{ width: "60px", textAlign: "right" }}>
-                <span
-                  className="font-bold"
-                  style={{
-                    color: pred.odds < 5 ? "#dc2626" : pred.odds < 10 ? "#ea580c" : "#64748b",
-                  }}
-                >
-                  {pred.odds > 0 ? pred.odds.toFixed(1) : "-"}
-                </span>
-              </div>
-
-              {/* 勝率 */}
-              <div style={{ width: "50px", textAlign: "right" }}>
-                <span style={{ color: "#475569", fontSize: "0.875rem" }}>
-                  {pred.winRate.toFixed(0)}%
-                </span>
-              </div>
-
-              {/* 複勝率 */}
-              <div style={{ width: "50px", textAlign: "right" }}>
-                <span style={{ color: "#475569", fontSize: "0.875rem" }}>
-                  {pred.showRate.toFixed(0)}%
-                </span>
-              </div>
-
-              {/* AI予測 */}
-              <div style={{ width: "60px", textAlign: "right" }}>
-                <span
-                  className="text-lg font-bold"
-                  style={{ color: "#0d9488", fontFamily: "monospace" }}
-                >
-                  {(pred.prob * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* 買い目推奨セクション */}
@@ -1286,93 +1309,126 @@ export default function Home() {
                       {[1, 2, 3].map((i) => (
                         <div
                           key={i}
-                          className="h-14 animate-pulse"
+                          className="h-16 animate-pulse"
                           style={{ background: "#f1f5f9", borderRadius: "8px" }}
                         />
                       ))}
                     </div>
                   ) : (
-                    race.predictions.slice(0, 3).map((pred, index) => (
-                      <div
-                        key={pred.number}
-                        className="flex items-center gap-3 px-4 py-3"
-                        style={{
-                          borderBottom: index < 2 ? "1px solid #f1f5f9" : "none",
-                          background: pred.isValue ? "rgba(16, 185, 129, 0.05)" : undefined,
-                        }}
-                      >
-                        {/* 順位 */}
+                    race.predictions.slice(0, 3).map((pred, index) => {
+                      // 人気順を計算（オッズが低い順）
+                      const sortedByOdds = [...race.predictions]
+                        .filter(p => p.odds > 0)
+                        .sort((a, b) => a.odds - b.odds);
+                      const popularity = sortedByOdds.findIndex(p => p.number === pred.number) + 1;
+
+                      // 確信度による色分け
+                      const prob = pred.prob * 100;
+                      const probColor = prob >= 70 ? "#059669" : prob >= 50 ? "#0d9488" : prob >= 30 ? "#64748b" : "#94a3b8";
+                      const probBg = prob >= 70 ? "#ecfdf5" : prob >= 50 ? "#f0fdfa" : "transparent";
+
+                      return (
                         <div
-                          className="w-7 h-7 flex items-center justify-center text-xs font-bold"
+                          key={pred.number}
+                          className="px-4 py-3"
                           style={{
-                            borderRadius: "8px",
-                            background:
-                              pred.rank === 1
-                                ? "linear-gradient(135deg, #fef3c7, #fde68a)"
-                                : pred.rank === 2
-                                ? "linear-gradient(135deg, #f1f5f9, #e2e8f0)"
-                                : "linear-gradient(135deg, #fed7aa, #fdba74)",
-                            color:
-                              pred.rank === 1
-                                ? "#92400e"
-                                : pred.rank === 2
-                                ? "#475569"
-                                : "#9a3412",
+                            borderBottom: index < 2 ? "1px solid #f1f5f9" : "none",
+                            background: prob >= 70 ? "rgba(5, 150, 105, 0.05)" : pred.isValue ? "rgba(16, 185, 129, 0.03)" : undefined,
                           }}
                         >
-                          {pred.rank}
-                        </div>
+                          {/* 上段: 順位・馬番・馬名 */}
+                          <div className="flex items-center gap-2 mb-1">
+                            {/* AI順位 */}
+                            <div
+                              className="w-6 h-6 flex items-center justify-center text-xs font-bold shrink-0"
+                              style={{
+                                borderRadius: "6px",
+                                background:
+                                  pred.rank === 1
+                                    ? "linear-gradient(135deg, #fef3c7, #fde68a)"
+                                    : pred.rank === 2
+                                    ? "linear-gradient(135deg, #f1f5f9, #e2e8f0)"
+                                    : "linear-gradient(135deg, #fed7aa, #fdba74)",
+                                color:
+                                  pred.rank === 1
+                                    ? "#92400e"
+                                    : pred.rank === 2
+                                    ? "#475569"
+                                    : "#9a3412",
+                              }}
+                            >
+                              {pred.rank}
+                            </div>
 
-                        {/* 馬番 */}
-                        <div
-                          className="w-8 h-8 flex items-center justify-center text-white text-sm font-bold"
-                          style={{
-                            borderRadius: "50%",
-                            background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
-                            boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
-                          }}
-                        >
-                          {pred.number}
-                        </div>
+                            {/* 馬番 */}
+                            <div
+                              className="w-7 h-7 flex items-center justify-center text-white text-sm font-bold shrink-0"
+                              style={{
+                                borderRadius: "50%",
+                                background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                                boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
+                              }}
+                            >
+                              {pred.number}
+                            </div>
 
-                        {/* 馬名・騎手・妙味 */}
-                        <div className="flex-1 min-w-0" style={{ maxWidth: "120px" }}>
-                          <div className="flex items-center gap-1">
-                            <p className="text-sm font-medium" style={{ color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {pred.name}
-                            </p>
+                            {/* 馬名（フル表示） */}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm leading-tight" style={{ color: "#1e293b" }}>
+                                {pred.name}
+                              </p>
+                            </div>
+
+                            {/* 確信度（大きく表示） */}
+                            <div
+                              className="px-2 py-1 rounded-lg shrink-0"
+                              style={{ background: probBg }}
+                            >
+                              <span
+                                className="text-lg font-bold"
+                                style={{ color: probColor, fontFamily: "monospace" }}
+                              >
+                                {prob.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 下段: 騎手・人気・オッズ */}
+                          <div className="flex items-center gap-2 pl-8">
+                            <span className="text-xs" style={{ color: "#64748b" }}>
+                              {pred.jockey}
+                            </span>
+                            {popularity > 0 && (
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded"
+                                style={{
+                                  background: popularity <= 3 ? "#fef3c7" : "#f1f5f9",
+                                  color: popularity <= 3 ? "#92400e" : "#64748b"
+                                }}
+                              >
+                                {popularity}番人気
+                              </span>
+                            )}
+                            <span
+                              className="text-xs font-medium"
+                              style={{
+                                color: pred.odds < 5 ? "#dc2626" : pred.odds < 10 ? "#ea580c" : "#64748b",
+                              }}
+                            >
+                              {pred.odds > 0 ? `${pred.odds.toFixed(1)}倍` : "-"}
+                            </span>
                             {pred.isValue && (
-                              <span style={{ fontSize: "14px", flexShrink: 0 }}>🔥</span>
+                              <span style={{ fontSize: "12px" }}>🔥</span>
+                            )}
+                            {prob >= 70 && (
+                              <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: "#dcfce7", color: "#166534" }}>
+                                おすすめ
+                              </span>
                             )}
                           </div>
-                          <p className="text-xs" style={{ color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {pred.jockey}
-                          </p>
                         </div>
-
-                        {/* オッズ */}
-                        <div className="text-right">
-                          <p
-                            className="text-sm font-bold"
-                            style={{
-                              color: pred.odds < 5 ? "#dc2626" : pred.odds < 10 ? "#ea580c" : "#64748b",
-                            }}
-                          >
-                            {pred.odds > 0 ? `${pred.odds.toFixed(1)}倍` : "-"}
-                          </p>
-                        </div>
-
-                        {/* 確率 */}
-                        <div className="text-right" style={{ minWidth: "48px" }}>
-                          <p
-                            className="text-lg font-bold"
-                            style={{ color: "#0d9488", fontFamily: "monospace" }}
-                          >
-                            {(pred.prob * 100).toFixed(0)}%
-                          </p>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 
