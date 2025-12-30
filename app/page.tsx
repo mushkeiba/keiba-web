@@ -266,92 +266,168 @@ export default function Home() {
     setRaces([]);
 
     try {
-      const listResponse = await fetch(`${API_URL}/api/races`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          track_code: selectedTrack,
-          date: selectedDate,
-        }),
-      });
+      // 1. まず事前計算済み予測を取得してみる（高速）
+      const precomputedResponse = await fetch(
+        `${API_URL}/api/predictions/${selectedDate}/${selectedTrack}`
+      );
 
-      if (!listResponse.ok) {
-        const errorData = await listResponse.json();
-        throw new Error(errorData.detail || "取得に失敗しました");
-      }
+      if (precomputedResponse.ok) {
+        // 事前計算済みデータあり → オッズだけリアルタイム取得
+        const precomputed = await precomputedResponse.json();
 
-      const listData = await listResponse.json();
-      const raceIds: string[] = listData.race_ids;
+        // まず予測データを表示（オッズなし）
+        const initialRaces: RaceWithLoading[] = precomputed.races.map(
+          (race: { id: string; race_id: string; name: string; distance: number; time: string; field_size: number; predictions: { rank: number; number: number; name: string; jockey: string; prob: number; win_rate: number; show_rate: number }[] }) => ({
+            id: race.id,
+            raceId: race.race_id,
+            name: race.name || "",
+            distance: race.distance,
+            time: race.time || "",
+            predictions: race.predictions.map((pred) => ({
+              rank: pred.rank,
+              number: pred.number,
+              name: pred.name,
+              jockey: pred.jockey,
+              prob: pred.prob,
+              winRate: pred.win_rate,
+              showRate: pred.show_rate,
+              odds: 0,
+              expectedValue: 0,
+              isValue: false,
+            })),
+            isLoading: false,
+          })
+        );
+        setRaces(initialRaces);
 
-      if (raceIds.length === 0) {
-        setError("レースが見つかりません");
-        setIsLoading(false);
-        return;
-      }
+        // オッズを並列取得して更新
+        for (const race of precomputed.races) {
+          try {
+            const oddsResponse = await fetch(`${API_URL}/api/odds`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                race_id: race.race_id,
+                track_code: selectedTrack,
+              }),
+            });
 
-      const placeholders: RaceWithLoading[] = raceIds.map((rid) => ({
-        id: rid.slice(-2),
-        name: "",
-        distance: 0,
-        time: "",
-        predictions: [],
-        isLoading: true,
-      }));
-      setRaces(placeholders);
+            if (oddsResponse.ok) {
+              const oddsData = await oddsResponse.json();
+              const oddsDict: Record<number, number> = oddsData.odds;
 
-      // 順次取得（1レースずつ表示）
-      for (const rid of raceIds) {
-        try {
-          const raceResponse = await fetch(`${API_URL}/api/predict/race`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              race_id: rid,
-              track_code: selectedTrack,
-            }),
-          });
-
-          if (raceResponse.ok) {
-            const raceData = await raceResponse.json();
-            const formattedRace: RaceWithLoading = {
-              id: raceData.id,
-              name: raceData.name || "",
-              distance: raceData.distance,
-              time: raceData.time || "",
-              predictions: raceData.predictions.map(
-                (pred: {
-                  rank: number;
-                  number: number;
-                  name: string;
-                  jockey: string;
-                  prob: number;
-                  win_rate: number;
-                  show_rate: number;
-                  odds: number;
-                  expected_value: number;
-                  is_value: boolean;
-                }) => ({
-                  rank: pred.rank,
-                  number: pred.number,
-                  name: pred.name,
-                  jockey: pred.jockey,
-                  prob: pred.prob,
-                  winRate: pred.win_rate,
-                  showRate: pred.show_rate,
-                  odds: pred.odds,
-                  expectedValue: pred.expected_value,
-                  isValue: pred.is_value,
+              setRaces((prev) =>
+                prev.map((r) => {
+                  if (r.id !== race.id) return r;
+                  return {
+                    ...r,
+                    predictions: r.predictions.map((pred) => {
+                      const odds = oddsDict[pred.number] || 0;
+                      const expectedValue = pred.prob * odds;
+                      return {
+                        ...pred,
+                        odds,
+                        expectedValue,
+                        isValue: expectedValue > 1.5,
+                      };
+                    }),
+                  };
                 })
-              ),
-              isLoading: false,
-            };
-
-            setRaces((prev) =>
-              prev.map((r) => (r.id === formattedRace.id ? formattedRace : r))
-            );
+              );
+            }
+          } catch {
+            // skip
           }
-        } catch {
-          // skip
+        }
+      } else {
+        // 事前計算なし → 従来のリアルタイム予測にフォールバック
+        const listResponse = await fetch(`${API_URL}/api/races`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            track_code: selectedTrack,
+            date: selectedDate,
+          }),
+        });
+
+        if (!listResponse.ok) {
+          const errorData = await listResponse.json();
+          throw new Error(errorData.detail || "取得に失敗しました");
+        }
+
+        const listData = await listResponse.json();
+        const raceIds: string[] = listData.race_ids;
+
+        if (raceIds.length === 0) {
+          setError("レースが見つかりません");
+          setIsLoading(false);
+          return;
+        }
+
+        const placeholders: RaceWithLoading[] = raceIds.map((rid) => ({
+          id: rid.slice(-2),
+          name: "",
+          distance: 0,
+          time: "",
+          predictions: [],
+          isLoading: true,
+        }));
+        setRaces(placeholders);
+
+        // 順次取得（1レースずつ表示）
+        for (const rid of raceIds) {
+          try {
+            const raceResponse = await fetch(`${API_URL}/api/predict/race`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                race_id: rid,
+                track_code: selectedTrack,
+              }),
+            });
+
+            if (raceResponse.ok) {
+              const raceData = await raceResponse.json();
+              const formattedRace: RaceWithLoading = {
+                id: raceData.id,
+                name: raceData.name || "",
+                distance: raceData.distance,
+                time: raceData.time || "",
+                predictions: raceData.predictions.map(
+                  (pred: {
+                    rank: number;
+                    number: number;
+                    name: string;
+                    jockey: string;
+                    prob: number;
+                    win_rate: number;
+                    show_rate: number;
+                    odds: number;
+                    expected_value: number;
+                    is_value: boolean;
+                  }) => ({
+                    rank: pred.rank,
+                    number: pred.number,
+                    name: pred.name,
+                    jockey: pred.jockey,
+                    prob: pred.prob,
+                    winRate: pred.win_rate,
+                    showRate: pred.show_rate,
+                    odds: pred.odds,
+                    expectedValue: pred.expected_value,
+                    isValue: pred.is_value,
+                  })
+                ),
+                isLoading: false,
+              };
+
+              setRaces((prev) =>
+                prev.map((r) => (r.id === formattedRace.id ? formattedRace : r))
+              );
+            }
+          } catch {
+            // skip
+          }
         }
       }
     } catch (err) {
