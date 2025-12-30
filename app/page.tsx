@@ -733,18 +733,21 @@ export default function Home() {
     fetchModelInfo();
   }, [selectedTrack]);
 
-  const handlePredict = async () => {
+  const handlePredict = async (forceRefresh = false) => {
     setIsLoading(true);
     setError(null);
-    setRaces([]);
 
-    // キャッシュチェック
-    const cached = getCache(selectedDate, selectedTrack);
-    if (cached && cached.length > 0) {
-      setRaces(cached);
-      setIsLoading(false);
-      return;
+    // キャッシュチェック（強制更新でなく、かつまだ表示してない場合のみ）
+    if (!forceRefresh && races.length === 0) {
+      const cached = getCache(selectedDate, selectedTrack);
+      if (cached && cached.length > 0) {
+        setRaces(cached);
+        setIsLoading(false);
+        return;
+      }
     }
+
+    setRaces([]);
 
     try {
       // 1. まず事前計算済み予測を取得してみる（高速）
@@ -1049,7 +1052,7 @@ export default function Home() {
 
               <div className="flex items-end">
                 <button
-                  onClick={handlePredict}
+                  onClick={() => handlePredict(true)}
                   disabled={isLoading}
                   className="w-full md:w-auto px-6 py-3 text-white font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
                   style={{
