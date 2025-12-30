@@ -313,8 +313,13 @@ function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
     }
   }
 
-  // EVの高い順にソート
-  return bets.sort((a, b) => b.ev - a.ev);
+  // レース順にソート（同じレース内はEV順）
+  return bets.sort((a, b) => {
+    const raceA = parseInt(a.raceId.replace(/\D/g, '')) || 0;
+    const raceB = parseInt(b.raceId.replace(/\D/g, '')) || 0;
+    if (raceA !== raceB) return raceA - raceB;
+    return b.ev - a.ev; // 同じレース内はEV高い順
+  });
 }
 
 // 成績計算関数
