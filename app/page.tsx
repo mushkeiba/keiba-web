@@ -83,6 +83,28 @@ interface BetRecommendation {
   reason: string;
 }
 
+// 分析結果の型定義
+interface AnalysisResult {
+  date: string;
+  summary: {
+    total_races: number;
+    win_hits: number;
+    win_rate: number;
+    show_hits: number;
+    show_rate: number;
+  };
+  by_track_condition: Record<string, { total: number; show_hits: number }>;
+  by_weather: Record<string, { total: number; show_hits: number }>;
+  by_distance: Record<string, { total: number; show_hits: number }>;
+  error_types: Record<string, number>;
+}
+
+interface AnalysisProgress {
+  current: number;
+  total: number;
+  race_id?: string;
+}
+
 // おすすめ賭け方を判定（カード用シンプル版）
 function getBetRecommendation(predictions: Prediction[]): { type: string; reason: string } {
   if (predictions.length < 2) return { type: "様子見", reason: "データ不足" };
@@ -622,7 +644,58 @@ export default function Home() {
   const [selectedRace, setSelectedRace] = useState<RaceWithLoading | null>(null);
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
 
+  // 分析関連のステート
+  const [activeTab, setActiveTab] = useState<"predict" | "analyze">("predict");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
   const currentTrack = TRACKS.find((t) => t.code === selectedTrack);
+
+  // 分析実行関数
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysisResult(null);
+    setAnalysisProgress(null);
+
+    try {
+      const eventSource = new EventSource(`${API_URL}/api/analyze/${selectedDate}`);
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "start") {
+          setAnalysisProgress({ current: 0, total: data.total });
+        } else if (data.type === "progress") {
+          setAnalysisProgress({
+            current: data.current,
+            total: data.total,
+            race_id: data.race_id,
+          });
+        } else if (data.type === "result") {
+          setAnalysisResult(data);
+          setAnalysisProgress(null);
+        } else if (data.type === "error") {
+          setAnalysisError(data.message);
+          setAnalysisProgress(null);
+        } else if (data.type === "complete") {
+          setIsAnalyzing(false);
+          eventSource.close();
+        }
+      };
+
+      eventSource.onerror = () => {
+        setAnalysisError("接続エラーが発生しました");
+        setIsAnalyzing(false);
+        eventSource.close();
+      };
+    } catch {
+      setAnalysisError("分析の開始に失敗しました");
+      setIsAnalyzing(false);
+    }
+  };
 
   // モデル情報を取得
   useEffect(() => {
@@ -829,11 +902,41 @@ export default function Home() {
         style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)" }}
       >
         <div className="max-w-6xl mx-auto px-4 py-3">
-          <h1 className="text-lg font-semibold">地方競馬 AI 予測</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold">地方競馬 AI 予測</h1>
+            {/* タブ切替 */}
+            <div className="flex gap-1" style={{ background: "rgba(255,255,255,0.1)", borderRadius: "8px", padding: "2px" }}>
+              <button
+                onClick={() => setActiveTab("predict")}
+                className="px-3 py-1.5 text-sm font-medium transition-all"
+                style={{
+                  background: activeTab === "predict" ? "#fff" : "transparent",
+                  color: activeTab === "predict" ? "#0d9488" : "rgba(255,255,255,0.8)",
+                  borderRadius: "6px",
+                }}
+              >
+                予測
+              </button>
+              <button
+                onClick={() => setActiveTab("analyze")}
+                className="px-3 py-1.5 text-sm font-medium transition-all"
+                style={{
+                  background: activeTab === "analyze" ? "#fff" : "transparent",
+                  color: activeTab === "analyze" ? "#0d9488" : "rgba(255,255,255,0.8)",
+                  borderRadius: "6px",
+                }}
+              >
+                分析
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 pb-24 md:pb-6">
+        {/* 予測タブ */}
+        {activeTab === "predict" && (
+          <>
         {/* Form Card */}
         <div
           className="mb-6 overflow-hidden"
@@ -1271,6 +1374,386 @@ export default function Home() {
               日付と競馬場を選択して「予測する」をクリック
             </p>
           </div>
+        )}
+          </>
+        )}
+
+        {/* 分析タブ */}
+        {activeTab === "analyze" && (
+          <>
+            {/* 日付選択 & 分析実行 */}
+            <div
+              className="mb-6 overflow-hidden"
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+              }}
+            >
+              <div
+                className="px-5 py-4 text-white flex items-center gap-3"
+                style={{ background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)" }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <div>
+                  <h3 className="font-semibold">誤答分析</h3>
+                  <p className="text-sm opacity-90">予測と結果を照合して弱点を発見</p>
+                </div>
+              </div>
+
+              <div className="p-5">
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2" style={{ color: "#475569" }}>
+                      分析対象日
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full px-4 py-3 text-base outline-none transition-all"
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "12px",
+                        background: "#fff",
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={isAnalyzing}
+                    className="px-6 py-3 text-white font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                    style={{
+                      background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                      borderRadius: "12px",
+                      boxShadow: "0 2px 4px rgba(99,102,241,0.3)",
+                    }}
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        分析中...
+                      </>
+                    ) : (
+                      "分析実行"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 進捗バー */}
+            {analysisProgress && (
+              <div
+                className="mb-6 p-4"
+                style={{
+                  background: "#fff",
+                  borderRadius: "16px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium" style={{ color: "#475569" }}>
+                    結果を取得中...
+                  </span>
+                  <span className="text-sm" style={{ color: "#64748b" }}>
+                    {analysisProgress.current} / {analysisProgress.total}
+                  </span>
+                </div>
+                <div
+                  className="h-2 overflow-hidden"
+                  style={{ background: "#e2e8f0", borderRadius: "4px" }}
+                >
+                  <div
+                    className="h-full transition-all duration-300"
+                    style={{
+                      width: `${(analysisProgress.current / analysisProgress.total) * 100}%`,
+                      background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                      borderRadius: "4px",
+                    }}
+                  />
+                </div>
+                {analysisProgress.race_id && (
+                  <p className="text-xs mt-2" style={{ color: "#94a3b8" }}>
+                    {analysisProgress.race_id}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* エラー */}
+            {analysisError && (
+              <div
+                className="mb-6 p-6 text-center"
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "16px",
+                }}
+              >
+                <p className="font-medium" style={{ color: "#dc2626" }}>{analysisError}</p>
+              </div>
+            )}
+
+            {/* 分析結果 */}
+            {analysisResult && (
+              <div className="space-y-6">
+                {/* サマリー */}
+                <div
+                  className="p-6"
+                  style={{
+                    background: analysisResult.summary.show_rate >= 50
+                      ? "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
+                      : "linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)",
+                    borderRadius: "16px",
+                    border: analysisResult.summary.show_rate >= 50 ? "1px solid #a7f3d0" : "1px solid #fca5a5",
+                  }}
+                >
+                  <h3 className="font-bold text-lg mb-4" style={{ color: "#1e293b" }}>
+                    📊 {selectedDate} の成績
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <p className="text-sm" style={{ color: "#64748b" }}>レース数</p>
+                      <p className="text-2xl font-bold" style={{ color: "#1e293b" }}>
+                        {analysisResult.summary.total_races}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm" style={{ color: "#64748b" }}>単勝的中</p>
+                      <p className="text-2xl font-bold" style={{ color: "#1e293b" }}>
+                        {analysisResult.summary.win_hits}/{analysisResult.summary.total_races}
+                        <span className="text-base font-normal ml-1">
+                          ({analysisResult.summary.win_rate.toFixed(1)}%)
+                        </span>
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm" style={{ color: "#64748b" }}>複勝的中</p>
+                      <p className="text-2xl font-bold" style={{ color: analysisResult.summary.show_rate >= 50 ? "#059669" : "#dc2626" }}>
+                        {analysisResult.summary.show_hits}/{analysisResult.summary.total_races}
+                        <span className="text-base font-normal ml-1">
+                          ({analysisResult.summary.show_rate.toFixed(1)}%)
+                        </span>
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm" style={{ color: "#64748b" }}>複勝率</p>
+                      <p
+                        className="text-3xl font-bold"
+                        style={{ color: analysisResult.summary.show_rate >= 50 ? "#059669" : "#dc2626" }}
+                      >
+                        {analysisResult.summary.show_rate.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 詳細分析グリッド */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* 馬場状態別 */}
+                  <div
+                    className="p-5"
+                    style={{
+                      background: "#fff",
+                      borderRadius: "16px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <h4 className="font-bold mb-4 flex items-center gap-2" style={{ color: "#1e293b" }}>
+                      <span>🏟️</span> 馬場状態別
+                    </h4>
+                    <div className="space-y-3">
+                      {Object.entries(analysisResult.by_track_condition).map(([cond, data]) => {
+                        const rate = data.total > 0 ? (data.show_hits / data.total) * 100 : 0;
+                        const isWeak = rate < analysisResult.summary.show_rate - 10;
+                        return (
+                          <div key={cond} className="flex items-center gap-3">
+                            <span className="w-12 text-sm font-medium" style={{ color: "#475569" }}>{cond}</span>
+                            <div className="flex-1 h-6 overflow-hidden" style={{ background: "#e2e8f0", borderRadius: "4px" }}>
+                              <div
+                                className="h-full flex items-center justify-end px-2 text-xs font-medium text-white"
+                                style={{
+                                  width: `${Math.max(rate, 5)}%`,
+                                  background: isWeak
+                                    ? "linear-gradient(135deg, #ef4444 0%, #f87171 100%)"
+                                    : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                {rate.toFixed(0)}%
+                              </div>
+                            </div>
+                            <span className="text-sm" style={{ color: "#64748b", minWidth: "50px" }}>
+                              {data.show_hits}/{data.total}
+                            </span>
+                            {isWeak && <span title="平均より10%以上低い">⚠️</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 天気別 */}
+                  <div
+                    className="p-5"
+                    style={{
+                      background: "#fff",
+                      borderRadius: "16px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <h4 className="font-bold mb-4 flex items-center gap-2" style={{ color: "#1e293b" }}>
+                      <span>🌤️</span> 天気別
+                    </h4>
+                    <div className="space-y-3">
+                      {Object.entries(analysisResult.by_weather).map(([weather, data]) => {
+                        const rate = data.total > 0 ? (data.show_hits / data.total) * 100 : 0;
+                        const isWeak = rate < analysisResult.summary.show_rate - 10;
+                        return (
+                          <div key={weather} className="flex items-center gap-3">
+                            <span className="w-12 text-sm font-medium" style={{ color: "#475569" }}>{weather}</span>
+                            <div className="flex-1 h-6 overflow-hidden" style={{ background: "#e2e8f0", borderRadius: "4px" }}>
+                              <div
+                                className="h-full flex items-center justify-end px-2 text-xs font-medium text-white"
+                                style={{
+                                  width: `${Math.max(rate, 5)}%`,
+                                  background: isWeak
+                                    ? "linear-gradient(135deg, #ef4444 0%, #f87171 100%)"
+                                    : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                {rate.toFixed(0)}%
+                              </div>
+                            </div>
+                            <span className="text-sm" style={{ color: "#64748b", minWidth: "50px" }}>
+                              {data.show_hits}/{data.total}
+                            </span>
+                            {isWeak && <span title="平均より10%以上低い">⚠️</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 距離別 */}
+                  <div
+                    className="p-5"
+                    style={{
+                      background: "#fff",
+                      borderRadius: "16px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <h4 className="font-bold mb-4 flex items-center gap-2" style={{ color: "#1e293b" }}>
+                      <span>📏</span> 距離別
+                    </h4>
+                    <div className="space-y-3">
+                      {Object.entries(analysisResult.by_distance).map(([dist, data]) => {
+                        const rate = data.total > 0 ? (data.show_hits / data.total) * 100 : 0;
+                        const isWeak = rate < analysisResult.summary.show_rate - 10;
+                        return (
+                          <div key={dist} className="flex items-center gap-3">
+                            <span className="w-32 text-sm font-medium" style={{ color: "#475569" }}>{dist}</span>
+                            <div className="flex-1 h-6 overflow-hidden" style={{ background: "#e2e8f0", borderRadius: "4px" }}>
+                              <div
+                                className="h-full flex items-center justify-end px-2 text-xs font-medium text-white"
+                                style={{
+                                  width: `${Math.max(rate, 5)}%`,
+                                  background: isWeak
+                                    ? "linear-gradient(135deg, #ef4444 0%, #f87171 100%)"
+                                    : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                {rate.toFixed(0)}%
+                              </div>
+                            </div>
+                            <span className="text-sm" style={{ color: "#64748b", minWidth: "50px" }}>
+                              {data.show_hits}/{data.total}
+                            </span>
+                            {isWeak && <span title="平均より10%以上低い">⚠️</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 外れパターン */}
+                  <div
+                    className="p-5"
+                    style={{
+                      background: "#fff",
+                      borderRadius: "16px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <h4 className="font-bold mb-4 flex items-center gap-2" style={{ color: "#1e293b" }}>
+                      <span>❌</span> 外れパターン
+                    </h4>
+                    {Object.keys(analysisResult.error_types).length > 0 ? (
+                      <div className="space-y-3">
+                        {Object.entries(analysisResult.error_types)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([errType, count]) => (
+                            <div key={errType} className="flex items-center justify-between">
+                              <span className="text-sm" style={{ color: "#475569" }}>{errType}</span>
+                              <span
+                                className="px-2 py-1 text-sm font-bold"
+                                style={{
+                                  background: count >= 5 ? "#fee2e2" : "#f1f5f9",
+                                  color: count >= 5 ? "#dc2626" : "#64748b",
+                                  borderRadius: "6px",
+                                }}
+                              >
+                                {count}件
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="text-center py-4" style={{ color: "#64748b" }}>
+                        外れなし 🎉
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 注意書き */}
+                <p className="text-center text-sm" style={{ color: "#94a3b8" }}>
+                  ⚠️ = 平均より10%以上低い（改善ポイント）
+                </p>
+              </div>
+            )}
+
+            {/* 初期状態 */}
+            {!isAnalyzing && !analysisResult && !analysisError && (
+              <div
+                className="p-12 text-center"
+                style={{
+                  background: "#fff",
+                  borderRadius: "16px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                }}
+              >
+                <svg className="w-16 h-16 mx-auto mb-4" style={{ color: "#cbd5e1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p className="text-lg mb-2" style={{ color: "#64748b" }}>
+                  予測の精度を分析しましょう
+                </p>
+                <p style={{ color: "#94a3b8" }}>
+                  レース終了後に日付を選択して「分析実行」をクリック
+                </p>
+              </div>
+            )}
+          </>
         )}
       </main>
 
