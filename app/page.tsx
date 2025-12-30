@@ -1370,7 +1370,6 @@ export default function Home() {
                       // 確信度による色分け
                       const prob = pred.prob * 100;
                       const probColor = prob >= 70 ? "#059669" : prob >= 50 ? "#0d9488" : prob >= 30 ? "#64748b" : "#94a3b8";
-                      const probBg = prob >= 70 ? "#ecfdf5" : prob >= 50 ? "#f0fdfa" : "transparent";
 
                       return (
                         <div
@@ -1378,16 +1377,16 @@ export default function Home() {
                           className="px-4 py-3"
                           style={{
                             borderBottom: index < 2 ? "1px solid #f1f5f9" : "none",
-                            background: prob >= 70 ? "rgba(5, 150, 105, 0.05)" : pred.isValue ? "rgba(16, 185, 129, 0.03)" : undefined,
+                            background: prob >= 70 ? "rgba(5, 150, 105, 0.04)" : pred.isValue ? "rgba(16, 185, 129, 0.02)" : undefined,
                           }}
                         >
-                          {/* 上段: 順位・馬番・馬名 */}
-                          <div className="flex items-center gap-2 mb-1">
+                          {/* 1行目: 順位・馬番・馬名・確信度 */}
+                          <div className="flex items-center gap-2">
                             {/* AI順位 */}
                             <div
-                              className="w-6 h-6 flex items-center justify-center text-xs font-bold shrink-0"
+                              className="w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0"
                               style={{
-                                borderRadius: "6px",
+                                borderRadius: "4px",
                                 background:
                                   pred.rank === 1
                                     ? "linear-gradient(135deg, #fef3c7, #fde68a)"
@@ -1411,85 +1410,85 @@ export default function Home() {
                               style={{
                                 borderRadius: "50%",
                                 background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
-                                boxShadow: "0 2px 4px rgba(13,148,136,0.3)",
                               }}
                             >
                               {pred.number}
                             </div>
 
-                            {/* 馬名（フル表示） */}
+                            {/* 馬名 */}
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm leading-tight" style={{ color: "#1e293b" }}>
+                              <span className="font-bold text-sm" style={{ color: "#1e293b" }}>
                                 {pred.name}
-                              </p>
-                            </div>
-
-                            {/* 確信度（大きく表示） */}
-                            <div
-                              className="px-2 py-1 rounded-lg shrink-0"
-                              style={{ background: probBg }}
-                            >
-                              <span
-                                className="text-lg font-bold"
-                                style={{ color: probColor, fontFamily: "monospace" }}
-                              >
-                                {prob.toFixed(0)}%
                               </span>
                             </div>
+
+                            {/* 確信度 */}
+                            <span
+                              className="text-lg font-bold shrink-0"
+                              style={{ color: probColor }}
+                            >
+                              {prob.toFixed(0)}%
+                            </span>
                           </div>
 
-                          {/* 下段: 騎手・人気・オッズ */}
-                          <div className="flex items-center gap-2 pl-8 flex-wrap">
-                            <span className="text-xs" style={{ color: "#64748b" }}>
+                          {/* 2行目: 騎手・人気 */}
+                          <div className="flex items-center gap-2 mt-1 ml-14">
+                            <span className="text-xs" style={{ color: "#94a3b8" }}>
                               {pred.jockey}
                             </span>
                             {popularity > 0 && (
                               <span
-                                className="text-xs px-1.5 py-0.5 rounded"
+                                className="text-xs px-1.5 py-0.5 rounded font-medium"
                                 style={{
-                                  background: popularity <= 3 ? "#fef3c7" : "#f1f5f9",
-                                  color: popularity <= 3 ? "#92400e" : "#64748b"
+                                  background: popularity === 1 ? "#fef3c7" : popularity <= 3 ? "#fefce8" : "#f8fafc",
+                                  color: popularity <= 3 ? "#a16207" : "#64748b"
                                 }}
                               >
-                                {popularity}番人気
+                                {popularity}人気
                               </span>
-                            )}
-                            {/* 単勝オッズ */}
-                            {pred.odds > 0 && (
-                              <span className="text-xs" style={{ color: "#64748b" }}>
-                                単{pred.odds.toFixed(1)}倍
-                              </span>
-                            )}
-                            {/* 複勝オッズ */}
-                            {pred.placeOdds > 0 && (
-                              <span
-                                className="text-xs font-medium px-1.5 py-0.5 rounded"
-                                style={{
-                                  background: pred.placeOdds >= 2 ? "#dbeafe" : "#f1f5f9",
-                                  color: pred.placeOdds >= 2 ? "#1e40af" : "#64748b",
-                                }}
-                              >
-                                複{pred.placeOddsMin.toFixed(1)}-{pred.placeOddsMax.toFixed(1)}倍
-                              </span>
-                            )}
-                            {/* 期待値表示 */}
-                            {pred.expectedValue > 0 && (
-                              <span
-                                className="text-xs font-medium"
-                                style={{
-                                  color: pred.expectedValue >= 1.0 ? "#059669" : "#64748b",
-                                }}
-                              >
-                                期待値{pred.expectedValue.toFixed(2)}
-                              </span>
-                            )}
-                            {pred.isValue && (
-                              <span style={{ fontSize: "12px" }}>🔥</span>
                             )}
                             {prob >= 70 && (
                               <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: "#dcfce7", color: "#166534" }}>
                                 おすすめ
                               </span>
+                            )}
+                          </div>
+
+                          {/* 3行目: オッズ・期待値 */}
+                          <div className="flex items-center gap-3 mt-1.5 ml-14">
+                            {/* 単勝 */}
+                            {pred.odds > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs" style={{ color: "#94a3b8" }}>単</span>
+                                <span className="text-xs font-medium" style={{ color: "#475569" }}>
+                                  {pred.odds.toFixed(1)}
+                                </span>
+                              </div>
+                            )}
+                            {/* 複勝 */}
+                            {pred.placeOdds > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs" style={{ color: "#94a3b8" }}>複</span>
+                                <span
+                                  className="text-xs font-medium"
+                                  style={{ color: pred.placeOdds >= 2 ? "#1d4ed8" : "#475569" }}
+                                >
+                                  {pred.placeOddsMin.toFixed(1)}-{pred.placeOddsMax.toFixed(1)}
+                                </span>
+                              </div>
+                            )}
+                            {/* 期待値 */}
+                            {pred.expectedValue > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs" style={{ color: "#94a3b8" }}>EV</span>
+                                <span
+                                  className="text-xs font-bold"
+                                  style={{ color: pred.expectedValue >= 1.0 ? "#059669" : "#64748b" }}
+                                >
+                                  {pred.expectedValue.toFixed(2)}
+                                </span>
+                                {pred.isValue && <span style={{ fontSize: "10px" }}>🔥</span>}
+                              </div>
                             )}
                           </div>
                         </div>
