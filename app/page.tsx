@@ -99,12 +99,6 @@ interface AnalysisResult {
   error_types: Record<string, number>;
 }
 
-interface AnalysisProgress {
-  current: number;
-  total: number;
-  race_id?: string;
-}
-
 // おすすめ賭け方を判定（カード用シンプル版）
 function getBetRecommendation(predictions: Prediction[]): { type: string; reason: string } {
   if (predictions.length < 2) return { type: "様子見", reason: "データ不足" };
@@ -647,7 +641,6 @@ export default function Home() {
   // 分析関連のステート
   const [activeTab, setActiveTab] = useState<"predict" | "analyze">("predict");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
@@ -697,41 +690,20 @@ export default function Home() {
     setIsAnalyzing(true);
     setAnalysisError(null);
     setAnalysisResult(null);
-    setAnalysisProgress(null);
 
     try {
-      const eventSource = new EventSource(`${API_URL}/api/analyze/${selectedDate}`);
+      const response = await fetch(`${API_URL}/api/analyze/${selectedDate}`);
 
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "分析に失敗しました");
+      }
 
-        if (data.type === "start") {
-          setAnalysisProgress({ current: 0, total: data.total });
-        } else if (data.type === "progress") {
-          setAnalysisProgress({
-            current: data.current,
-            total: data.total,
-            race_id: data.race_id,
-          });
-        } else if (data.type === "result") {
-          setAnalysisResult(data);
-          setAnalysisProgress(null);
-        } else if (data.type === "error") {
-          setAnalysisError(data.message);
-          setAnalysisProgress(null);
-        } else if (data.type === "complete") {
-          setIsAnalyzing(false);
-          eventSource.close();
-        }
-      };
-
-      eventSource.onerror = () => {
-        setAnalysisError("接続エラーが発生しました");
-        setIsAnalyzing(false);
-        eventSource.close();
-      };
-    } catch {
-      setAnalysisError("分析の開始に失敗しました");
+      const data = await response.json();
+      setAnalysisResult(data);
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : "分析に失敗しました");
+    } finally {
       setIsAnalyzing(false);
     }
   };
@@ -1521,45 +1493,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-
-            {/* 進捗バー */}
-            {analysisProgress && (
-              <div
-                className="mb-6 p-4"
-                style={{
-                  background: "#fff",
-                  borderRadius: "16px",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium" style={{ color: "#475569" }}>
-                    結果を取得中...
-                  </span>
-                  <span className="text-sm" style={{ color: "#64748b" }}>
-                    {analysisProgress.current} / {analysisProgress.total}
-                  </span>
-                </div>
-                <div
-                  className="h-2 overflow-hidden"
-                  style={{ background: "#e2e8f0", borderRadius: "4px" }}
-                >
-                  <div
-                    className="h-full transition-all duration-300"
-                    style={{
-                      width: `${(analysisProgress.current / analysisProgress.total) * 100}%`,
-                      background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                      borderRadius: "4px",
-                    }}
-                  />
-                </div>
-                {analysisProgress.race_id && (
-                  <p className="text-xs mt-2" style={{ color: "#94a3b8" }}>
-                    {analysisProgress.race_id}
-                  </p>
-                )}
-              </div>
-            )}
 
             {/* エラー */}
             {analysisError && (
