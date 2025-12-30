@@ -64,6 +64,64 @@ interface ModelInfo {
   auc: number;
 }
 
+interface DailyStats {
+  finishedRaces: number;
+  winHits: number;
+  showHits: number;
+  totalBet: number;
+  totalPayout: number;
+  winRate: number;
+  showRate: number;
+  roi: number;
+}
+
+// 成績計算関数
+function calculateStats(races: RaceWithLoading[]): DailyStats | null {
+  const finishedRaces = races.filter((r) => r.result && r.result.length > 0);
+  if (finishedRaces.length === 0) return null;
+
+  let winHits = 0;
+  let showHits = 0;
+  let totalPayout = 0;
+
+  for (const race of finishedRaces) {
+    if (!race.result || race.predictions.length === 0) continue;
+
+    // 予測1位の馬番
+    const pred1st = race.predictions[0].number;
+    const pred1stOdds = race.predictions[0].odds;
+
+    // 実際の結果
+    const actual1st = race.result[0]?.number;
+    const actualTop3 = race.result.map((r) => r.number);
+
+    // 単勝的中
+    if (pred1st === actual1st) {
+      winHits++;
+      if (pred1stOdds > 0) {
+        totalPayout += pred1stOdds * 100;
+      }
+    }
+    // 複勝的中（単勝以外で3着以内）
+    else if (actualTop3.includes(pred1st)) {
+      showHits++;
+    }
+  }
+
+  const totalBet = finishedRaces.length * 100;
+
+  return {
+    finishedRaces: finishedRaces.length,
+    winHits,
+    showHits,
+    totalBet,
+    totalPayout,
+    winRate: finishedRaces.length > 0 ? (winHits / finishedRaces.length) * 100 : 0,
+    showRate: finishedRaces.length > 0 ? ((winHits + showHits) / finishedRaces.length) * 100 : 0,
+    roi: totalBet > 0 ? (totalPayout / totalBet) * 100 : 0,
+  };
+}
+
 // モーダルコンポーネント
 function RaceModal({
   race,
@@ -647,6 +705,59 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Daily Stats */}
+        {races.length > 0 && (() => {
+          const stats = calculateStats(races);
+          if (!stats) return null;
+          return (
+            <div
+              className="mb-6 p-4 flex flex-wrap items-center justify-between gap-4"
+              style={{
+                background: stats.roi >= 100
+                  ? "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
+                  : "linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)",
+                borderRadius: "16px",
+                border: stats.roi >= 100 ? "1px solid #a7f3d0" : "1px solid #fca5a5",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: "24px" }}>{stats.roi >= 100 ? "📈" : "📉"}</span>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: "#64748b" }}>本日の成績</p>
+                  <p className="text-xs" style={{ color: "#94a3b8" }}>
+                    確定 {stats.finishedRaces}R / 全 {races.length}R
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="text-center">
+                  <p className="text-xs" style={{ color: "#64748b" }}>単勝的中</p>
+                  <p className="font-bold" style={{ color: "#1e293b" }}>
+                    {stats.winHits}/{stats.finishedRaces}
+                    <span className="text-sm font-normal ml-1">({stats.winRate.toFixed(0)}%)</span>
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs" style={{ color: "#64748b" }}>複勝的中</p>
+                  <p className="font-bold" style={{ color: "#1e293b" }}>
+                    {stats.winHits + stats.showHits}/{stats.finishedRaces}
+                    <span className="text-sm font-normal ml-1">({stats.showRate.toFixed(0)}%)</span>
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs" style={{ color: "#64748b" }}>回収率</p>
+                  <p
+                    className="text-xl font-bold"
+                    style={{ color: stats.roi >= 100 ? "#059669" : "#dc2626" }}
+                  >
+                    {stats.roi.toFixed(0)}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Results Header */}
         {races.length > 0 && (
