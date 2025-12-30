@@ -75,7 +75,15 @@ interface DailyStats {
   roi: number;
 }
 
-// おすすめ賭け方を判定
+// 買い目の型定義
+interface BetRecommendation {
+  type: string;
+  horses: number[];
+  confidence: "高" | "中" | "低";
+  reason: string;
+}
+
+// おすすめ賭け方を判定（カード用シンプル版）
 function getBetRecommendation(predictions: Prediction[]): { type: string; reason: string } {
   if (predictions.length < 2) return { type: "様子見", reason: "データ不足" };
 
@@ -92,6 +100,125 @@ function getBetRecommendation(predictions: Prediction[]): { type: string; reason
   } else {
     return { type: "複勝", reason: "安定狙い" };
   }
+}
+
+// 詳細な買い目推奨（モーダル用）
+function getDetailedBetRecommendations(predictions: Prediction[]): BetRecommendation[] {
+  if (predictions.length < 3) return [];
+
+  const recs: BetRecommendation[] = [];
+  const p1 = predictions[0];
+  const p2 = predictions[1];
+  const p3 = predictions[2];
+  const p4 = predictions[3];
+
+  const prob1 = p1.prob;
+  const prob2 = p2.prob;
+  const prob3 = p3.prob;
+  const prob4 = p4?.prob || 0;
+
+  const diff12 = (prob1 - prob2) * 100;
+  const diff23 = (prob2 - prob3) * 100;
+  const diff34 = (prob3 - prob4) * 100;
+  const top3Sum = (prob1 + prob2 + prob3) * 100;
+
+  // === 単勝 ===
+  if (prob1 >= 0.45 && diff12 >= 12) {
+    recs.push({
+      type: "単勝",
+      horses: [p1.number],
+      confidence: prob1 >= 0.55 ? "高" : "中",
+      reason: `${p1.name}が抜けた存在（${(prob1 * 100).toFixed(0)}%）`,
+    });
+  }
+
+  // === 複勝 ===
+  if (prob1 >= 0.35) {
+    recs.push({
+      type: "複勝",
+      horses: [p1.number],
+      confidence: prob1 >= 0.45 ? "高" : "中",
+      reason: `${p1.name}の3着内率が高い`,
+    });
+  }
+  // 2位も複勝推奨（混戦時）
+  if (prob2 >= 0.30 && diff12 < 15) {
+    recs.push({
+      type: "複勝",
+      horses: [p2.number],
+      confidence: "中",
+      reason: `${p2.name}も上位争い`,
+    });
+  }
+
+  // === ワイド ===
+  if (top3Sum >= 90 && diff23 < 15) {
+    // TOP3が拮抗
+    recs.push({
+      type: "ワイド",
+      horses: [p1.number, p2.number],
+      confidence: "高",
+      reason: "本命-対抗の堅い組み合わせ",
+    });
+    if (diff23 < 10) {
+      recs.push({
+        type: "ワイド",
+        horses: [p1.number, p3.number],
+        confidence: "中",
+        reason: "本命-3番手で手広く",
+      });
+    }
+  }
+
+  // === 馬連 ===
+  if (prob1 + prob2 >= 0.65 && diff12 < 20) {
+    recs.push({
+      type: "馬連",
+      horses: [p1.number, p2.number],
+      confidence: prob1 + prob2 >= 0.75 ? "高" : "中",
+      reason: "上位2頭で決まりやすい",
+    });
+  }
+
+  // === 馬単 ===
+  if (prob1 >= 0.50 && diff12 >= 15 && prob2 >= 0.25) {
+    recs.push({
+      type: "馬単",
+      horses: [p1.number, p2.number],
+      confidence: diff12 >= 20 ? "高" : "中",
+      reason: `${p1.name}頭固定が有力`,
+    });
+  }
+
+  // === 三連複 ===
+  if (top3Sum >= 100 && diff34 >= 8) {
+    recs.push({
+      type: "三連複",
+      horses: [p1.number, p2.number, p3.number],
+      confidence: top3Sum >= 120 ? "高" : "中",
+      reason: "上位3頭が堅い",
+    });
+  } else if (top3Sum >= 85 && diff34 < 8) {
+    // 4番手も絡みそう
+    recs.push({
+      type: "三連複",
+      horses: [p1.number, p2.number, p3.number],
+      confidence: "中",
+      reason: "荒れ注意、4番手も警戒",
+    });
+  }
+
+  // === 三連単 ===
+  if (prob1 >= 0.50 && diff12 >= 15 && prob2 >= 0.25 && diff23 >= 10) {
+    recs.push({
+      type: "三連単",
+      horses: [p1.number, p2.number, p3.number],
+      confidence: "中",
+      reason: `${p1.name}→${p2.name}→${p3.name}の順`,
+    });
+  }
+
+  return recs;
 }
 
 // 成績計算関数
@@ -349,6 +476,112 @@ function RaceModal({
             </div>
           ))}
         </div>
+
+        {/* 買い目推奨セクション */}
+        {!race.result && race.predictions.length >= 3 && (() => {
+          const bets = getDetailedBetRecommendations(race.predictions);
+          if (bets.length === 0) return null;
+
+          return (
+            <div
+              className="px-6 py-4"
+              style={{ background: "#f0fdf4", borderTop: "1px solid #bbf7d0" }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <span style={{ fontSize: "18px" }}>📊</span>
+                <h4 className="font-bold" style={{ color: "#166534" }}>
+                  おすすめ買い目
+                </h4>
+                <span className="text-xs px-2 py-0.5" style={{ background: "#dcfce7", color: "#166534", borderRadius: "4px" }}>
+                  AI分析
+                </span>
+              </div>
+              <div className="grid gap-2">
+                {bets.map((bet, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 px-3 py-2"
+                    style={{
+                      background: "#fff",
+                      borderRadius: "8px",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    {/* 券種 */}
+                    <span
+                      className="px-2 py-1 text-xs font-bold"
+                      style={{
+                        background:
+                          bet.type === "単勝" ? "#fef3c7" :
+                          bet.type === "複勝" ? "#dbeafe" :
+                          bet.type === "ワイド" ? "#e0e7ff" :
+                          bet.type === "馬連" ? "#fce7f3" :
+                          bet.type === "馬単" ? "#fee2e2" :
+                          bet.type === "三連複" ? "#d1fae5" :
+                          "#fef9c3",
+                        color:
+                          bet.type === "単勝" ? "#92400e" :
+                          bet.type === "複勝" ? "#1e40af" :
+                          bet.type === "ワイド" ? "#3730a3" :
+                          bet.type === "馬連" ? "#9d174d" :
+                          bet.type === "馬単" ? "#b91c1c" :
+                          bet.type === "三連複" ? "#065f46" :
+                          "#854d0e",
+                        borderRadius: "4px",
+                        minWidth: "52px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {bet.type}
+                    </span>
+
+                    {/* 馬番 */}
+                    <div className="flex items-center gap-1">
+                      {bet.horses.map((num, i) => (
+                        <span key={num} className="flex items-center">
+                          <span
+                            className="w-6 h-6 flex items-center justify-center text-white text-xs font-bold"
+                            style={{
+                              borderRadius: "50%",
+                              background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                            }}
+                          >
+                            {num}
+                          </span>
+                          {i < bet.horses.length - 1 && (
+                            <span className="mx-0.5 text-gray-400">
+                              {bet.type === "馬単" || bet.type === "三連単" ? "→" : "-"}
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* 信頼度 */}
+                    <span
+                      className="px-1.5 py-0.5 text-xs font-medium"
+                      style={{
+                        background: bet.confidence === "高" ? "#dcfce7" : bet.confidence === "中" ? "#fef9c3" : "#f1f5f9",
+                        color: bet.confidence === "高" ? "#166534" : bet.confidence === "中" ? "#854d0e" : "#64748b",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      {bet.confidence}
+                    </span>
+
+                    {/* 理由 */}
+                    <span className="flex-1 text-xs" style={{ color: "#64748b" }}>
+                      {bet.reason}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs" style={{ color: "#64748b" }}>
+                ※ AI予測確率に基づく参考情報です。投資は自己責任で。
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Modal Footer */}
         <div
