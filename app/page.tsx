@@ -275,18 +275,28 @@ function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
       race.result.forEach(r => resultMap.set(r.number, r.rank));
     }
 
-    // APIから返される層別買い目を使用
+    // 回収率ベース買い目: 予測1位 & オッズ条件クリアのみ
+    // ※APIはオッズなしでbet_layer判定できないので、フロントで判定
+    const MIN_PLACE_ODDS = 1.5;  // 大井・川崎共通で1.5倍以上
+
     for (const pred of race.predictions) {
-      // roi_buyのみ対象（watchは様子見なので除外）
-      if (pred.betLayer !== "roi_buy") continue;
+      // 予測1位のみ対象
+      if (pred.rank !== 1) continue;
 
       const prob = pred.prob * 100;
       const ev = pred.expectedValue;
       const placeOddsAvg = pred.placeOdds || 0;
 
-      // 回収率ベースの買い目（全て「買い」表示）
-      const betType: "本命" | "対抗" | "穴" = "本命";  // 表示は「買い」
-      const betAmount = pred.recommendedBet || 100;
+      // オッズ条件チェック（複勝オッズ1.5倍以上）
+      if (placeOddsAvg < MIN_PLACE_ODDS) continue;
+
+      // 期待値に応じた賭け金
+      let betAmount = 100;
+      if (ev > 2.0) betAmount = 500;
+      else if (ev > 1.5) betAmount = 300;
+      else if (ev > 1.2) betAmount = 200;
+
+      const betType: "本命" | "対抗" | "穴" = "本命";
 
       bets.push({
         raceId: race.id,
