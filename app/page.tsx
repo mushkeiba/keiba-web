@@ -35,7 +35,7 @@ interface Prediction {
   placeOddsMax: number;
   expectedValue: number;
   isValue: boolean;
-  betLayer: "honmei" | "ana" | null;  // 層別買い目
+  betLayer: "roi_buy" | "watch" | null;  // 回収率ベース買い目
   recommendedBet: number;              // 推奨賭け金
 }
 
@@ -262,7 +262,7 @@ interface AutoBet {
   result?: number; // 着順
 }
 
-// 自動買い目を計算（層別ロジック：確率ベースで安定）
+// 自動買い目を計算（回収率ベース：予測1位 & オッズ条件）
 function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
   const bets: AutoBet[] = [];
 
@@ -277,16 +277,16 @@ function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
 
     // APIから返される層別買い目を使用
     for (const pred of race.predictions) {
-      // betLayerがある馬のみ対象
-      if (!pred.betLayer) continue;
+      // roi_buyのみ対象（watchは様子見なので除外）
+      if (pred.betLayer !== "roi_buy") continue;
 
       const prob = pred.prob * 100;
       const ev = pred.expectedValue;
       const placeOddsAvg = pred.placeOdds || 0;
 
-      // 層別の買い目タイプと金額
-      const betType: "本命" | "対抗" | "穴" = pred.betLayer === "honmei" ? "本命" : "穴";
-      const betAmount = pred.recommendedBet || (pred.betLayer === "honmei" ? 500 : 300);
+      // 回収率ベースの買い目（全て「買い」表示）
+      const betType: "本命" | "対抗" | "穴" = "本命";  // 表示は「買い」
+      const betAmount = pred.recommendedBet || 100;
 
       bets.push({
         raceId: race.id,
@@ -889,7 +889,7 @@ export default function Home() {
 
         // まず予測データを表示（オッズなし）
         const initialRaces: RaceWithLoading[] = precomputed.races.map(
-          (race: { id: string; race_id: string; name: string; distance: number; time: string; field_size: number; predictions: { rank: number; number: number; name: string; jockey: string; prob: number; win_rate: number; show_rate: number; bet_layer?: "honmei" | "ana" | null; recommended_bet?: number }[] }) => ({
+          (race: { id: string; race_id: string; name: string; distance: number; time: string; field_size: number; predictions: { rank: number; number: number; name: string; jockey: string; prob: number; win_rate: number; show_rate: number; bet_layer?: "roi_buy" | "watch" | null; recommended_bet?: number }[] }) => ({
             id: race.id,
             raceId: race.race_id,
             name: race.name || "",
@@ -1059,7 +1059,7 @@ export default function Home() {
                     place_odds_max?: number;
                     expected_value: number;
                     is_value: boolean;
-                    bet_layer?: "honmei" | "ana" | null;
+                    bet_layer?: "roi_buy" | "watch" | null;
                     recommended_bet?: number;
                   }) => ({
                     rank: pred.rank,
@@ -1352,7 +1352,7 @@ export default function Home() {
                     <span style={{ fontSize: "24px" }}>🎯</span>
                     <div>
                       <h3 className="font-bold text-lg">今日の買い目</h3>
-                      <p className="text-sm opacity-90">本命層(60%↑) + 穴馬層(40%↑&高配当)</p>
+                      <p className="text-sm opacity-90">回収率100%+戦略（予測1位 & オッズ条件クリア）</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1449,11 +1449,11 @@ export default function Home() {
                         <span
                           className="text-xs px-2 py-0.5 rounded-full font-bold"
                           style={{
-                            background: bet.type === "本命" ? "#fef3c7" : bet.type === "穴" ? "#fce7f3" : "#dbeafe",
-                            color: bet.type === "本命" ? "#92400e" : bet.type === "穴" ? "#be185d" : "#1e40af",
+                            background: "#d1fae5",
+                            color: "#065f46",
                           }}
                         >
-                          {bet.type}
+                          買い
                         </span>
                         {bet.isFinished && bet.result && (
                           <span
@@ -1505,7 +1505,7 @@ export default function Home() {
                   </span>
                 </div>
                 <span className="text-xs" style={{ color: "#a16207" }}>
-                  確率ベースで安定した買い目
+                  回収率100%+を狙う買い目
                 </span>
               </div>
             </div>
