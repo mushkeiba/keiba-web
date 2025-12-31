@@ -889,7 +889,7 @@ export default function Home() {
 
         // まず予測データを表示（オッズなし）
         const initialRaces: RaceWithLoading[] = precomputed.races.map(
-          (race: { id: string; race_id: string; name: string; distance: number; time: string; field_size: number; predictions: { rank: number; number: number; name: string; jockey: string; prob: number; win_rate: number; show_rate: number }[] }) => ({
+          (race: { id: string; race_id: string; name: string; distance: number; time: string; field_size: number; predictions: { rank: number; number: number; name: string; jockey: string; prob: number; win_rate: number; show_rate: number; bet_layer?: "honmei" | "ana" | null; recommended_bet?: number }[] }) => ({
             id: race.id,
             raceId: race.race_id,
             name: race.name || "",
@@ -909,6 +909,8 @@ export default function Home() {
               placeOddsMax: 0,
               expectedValue: 0,
               isValue: false,
+              betLayer: pred.bet_layer || null,
+              recommendedBet: pred.recommended_bet || 0,
             })),
             isLoading: false,
           })
