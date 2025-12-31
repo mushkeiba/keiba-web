@@ -262,12 +262,23 @@ interface AutoBet {
   result?: number; // 着順
 }
 
-// 自動買い目を計算（回収率ベース：予測1位 & オッズ条件）
+// 自動買い目を計算（高回収率戦略：3つのフィルター適用）
+// 参考: https://qiita.com/umaro_ai/items/d1e0b61f90098ee7fbcb
 function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
   const bets: AutoBet[] = [];
 
+  // === 高回収率フィルター設定 ===
+  const MIN_PROB_DIFF = 0.10;    // 1位と2位の確率差 ≥ 10%（回収率130%→168%）
+  const MIN_EV = 1.5;            // 期待値 ≥ 1.5（回収率147%達成ライン）
+  const MIN_RACE_NUMBER = 8;     // 8R以降のみ（後半レース特化）
+  const MIN_PLACE_ODDS = 1.3;    // 複勝オッズ1.3倍以上（緩和）
+
   for (const race of races) {
     if (race.isLoading || race.predictions.length === 0) continue;
+
+    // フィルター1: 後半レース(8R以降)のみ
+    const raceNum = parseInt(race.id.replace(/\D/g, '')) || 0;
+    if (raceNum < MIN_RACE_NUMBER) continue;
 
     const isFinished = race.result && race.result.length > 0;
     const resultMap = new Map<number, number>();
@@ -275,48 +286,53 @@ function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
       race.result.forEach(r => resultMap.set(r.number, r.rank));
     }
 
-    // 回収率ベース買い目: 予測1位 & オッズ条件クリアのみ
-    // ※APIはオッズなしでbet_layer判定できないので、フロントで判定
-    const MIN_PLACE_ODDS = 1.5;  // 大井・川崎共通で1.5倍以上
+    // 予測1位と2位を取得
+    const sorted = [...race.predictions].sort((a, b) => b.prob - a.prob);
+    if (sorted.length < 2) continue;
 
-    for (const pred of race.predictions) {
-      // 予測1位のみ対象
-      if (pred.rank !== 1) continue;
+    const first = sorted[0];
+    const second = sorted[1];
+    const probDiff = first.prob - second.prob;
 
-      const prob = pred.prob * 100;
-      const ev = pred.expectedValue;
-      const placeOddsAvg = pred.placeOdds || 0;
+    // フィルター2: 1位と2位の確率差 ≥ 10%
+    if (probDiff < MIN_PROB_DIFF) continue;
 
-      // オッズ条件チェック（複勝オッズ1.5倍以上）
-      if (placeOddsAvg < MIN_PLACE_ODDS) continue;
+    const ev = first.expectedValue;
+    const placeOddsAvg = first.placeOdds || 0;
 
-      // 期待値に応じた賭け金
-      let betAmount = 100;
-      if (ev > 2.0) betAmount = 500;
-      else if (ev > 1.5) betAmount = 300;
-      else if (ev > 1.2) betAmount = 200;
+    // フィルター3: 期待値 ≥ 1.5
+    if (ev < MIN_EV) continue;
 
-      const betType: "本命" | "対抗" | "穴" = "本命";
+    // フィルター4: オッズ条件
+    if (placeOddsAvg < MIN_PLACE_ODDS) continue;
 
-      bets.push({
-        raceId: race.id,
-        raceName: race.name || `${race.id}R`,
-        raceTime: race.time || "",
-        number: pred.number,
-        name: pred.name,
-        jockey: pred.jockey,
-        prob: prob,
-        odds: pred.odds,
-        placeOddsMin: pred.placeOddsMin,
-        placeOddsMax: pred.placeOddsMax,
-        placeOddsAvg: placeOddsAvg,
-        ev: ev,
-        betAmount: betAmount,
-        type: betType,
-        isFinished: !!isFinished,
-        result: resultMap.get(pred.number),
-      });
-    }
+    // 全条件クリア → 買い目追加
+    // 期待値に応じた賭け金（高期待値ほど多く）
+    let betAmount = 200;
+    if (ev > 2.5) betAmount = 500;
+    else if (ev > 2.0) betAmount = 400;
+    else if (ev > 1.7) betAmount = 300;
+
+    const betType: "本命" | "対抗" | "穴" = "本命";
+
+    bets.push({
+      raceId: race.id,
+      raceName: race.name || `${race.id}R`,
+      raceTime: race.time || "",
+      number: first.number,
+      name: first.name,
+      jockey: first.jockey,
+      prob: first.prob * 100,
+      odds: first.odds,
+      placeOddsMin: first.placeOddsMin,
+      placeOddsMax: first.placeOddsMax,
+      placeOddsAvg: placeOddsAvg,
+      ev: ev,
+      betAmount: betAmount,
+      type: betType,
+      isFinished: !!isFinished,
+      result: resultMap.get(first.number),
+    });
   }
 
   // レース順にソート（同じレース内は本命→穴の順、確率高い順）
@@ -1362,7 +1378,7 @@ export default function Home() {
                     <span style={{ fontSize: "24px" }}>🎯</span>
                     <div>
                       <h3 className="font-bold text-lg">今日の買い目</h3>
-                      <p className="text-sm opacity-90">回収率100%+戦略（予測1位 & オッズ条件クリア）</p>
+                      <p className="text-sm opacity-90">高回収率戦略（8R〜 & 差10%↑ & EV1.5↑）</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1515,7 +1531,7 @@ export default function Home() {
                   </span>
                 </div>
                 <span className="text-xs" style={{ color: "#a16207" }}>
-                  回収率100%+を狙う買い目
+                  厳選フィルターで回収率150%+を狙う
                 </span>
               </div>
             </div>
