@@ -35,6 +35,8 @@ interface Prediction {
   placeOddsMax: number;
   expectedValue: number;
   isValue: boolean;
+  betLayer: "honmei" | "ana" | null;  // 層別買い目
+  recommendedBet: number;              // 推奨賭け金
 }
 
 interface RaceResult {
@@ -260,7 +262,7 @@ interface AutoBet {
   result?: number; // 着順
 }
 
-// 自動買い目を計算
+// 自動買い目を計算（層別ロジック：確率ベースで安定）
 function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
   const bets: AutoBet[] = [];
 
@@ -273,52 +275,48 @@ function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
       race.result.forEach(r => resultMap.set(r.number, r.rank));
     }
 
-    for (const pred of race.predictions.slice(0, 3)) { // 上位3頭まで検討
+    // APIから返される層別買い目を使用
+    for (const pred of race.predictions) {
+      // betLayerがある馬のみ対象
+      if (!pred.betLayer) continue;
+
       const prob = pred.prob * 100;
       const ev = pred.expectedValue;
       const placeOddsAvg = pred.placeOdds || 0;
 
-      // 条件: EV >= 2.0 かつ 確信度 >= 35%（回収率重視版）
-      if (ev >= 2.0 && prob >= 35) {
-        let betType: "本命" | "対抗" | "穴" = "対抗";
-        let betAmount = 500;
+      // 層別の買い目タイプと金額
+      const betType: "本命" | "対抗" | "穴" = pred.betLayer === "honmei" ? "本命" : "穴";
+      const betAmount = pred.recommendedBet || (pred.betLayer === "honmei" ? 500 : 300);
 
-        if (prob >= 60 && ev >= 2.5) {
-          betType = "本命";
-          betAmount = 500;
-        } else if (prob < 45 || ev >= 5.0) {
-          betType = "穴";
-          betAmount = 300;
-        }
-
-        bets.push({
-          raceId: race.id,
-          raceName: race.name || `${race.id}R`,
-          raceTime: race.time || "",
-          number: pred.number,
-          name: pred.name,
-          jockey: pred.jockey,
-          prob: prob,
-          odds: pred.odds,
-          placeOddsMin: pred.placeOddsMin,
-          placeOddsMax: pred.placeOddsMax,
-          placeOddsAvg: placeOddsAvg,
-          ev: ev,
-          betAmount: betAmount,
-          type: betType,
-          isFinished: !!isFinished,
-          result: resultMap.get(pred.number),
-        });
-      }
+      bets.push({
+        raceId: race.id,
+        raceName: race.name || `${race.id}R`,
+        raceTime: race.time || "",
+        number: pred.number,
+        name: pred.name,
+        jockey: pred.jockey,
+        prob: prob,
+        odds: pred.odds,
+        placeOddsMin: pred.placeOddsMin,
+        placeOddsMax: pred.placeOddsMax,
+        placeOddsAvg: placeOddsAvg,
+        ev: ev,
+        betAmount: betAmount,
+        type: betType,
+        isFinished: !!isFinished,
+        result: resultMap.get(pred.number),
+      });
     }
   }
 
-  // レース順にソート（同じレース内はEV順）
+  // レース順にソート（同じレース内は本命→穴の順、確率高い順）
   return bets.sort((a, b) => {
     const raceA = parseInt(a.raceId.replace(/\D/g, '')) || 0;
     const raceB = parseInt(b.raceId.replace(/\D/g, '')) || 0;
     if (raceA !== raceB) return raceA - raceB;
-    return b.ev - a.ev; // 同じレース内はEV高い順
+    // 本命を先に
+    if (a.type !== b.type) return a.type === "本命" ? -1 : 1;
+    return b.prob - a.prob; // 同じ層内は確率高い順
   });
 }
 
@@ -1059,6 +1057,8 @@ export default function Home() {
                     place_odds_max?: number;
                     expected_value: number;
                     is_value: boolean;
+                    bet_layer?: "honmei" | "ana" | null;
+                    recommended_bet?: number;
                   }) => ({
                     rank: pred.rank,
                     number: pred.number,
@@ -1073,6 +1073,8 @@ export default function Home() {
                     placeOddsMax: pred.place_odds_max || 0,
                     expectedValue: pred.expected_value,
                     isValue: pred.is_value,
+                    betLayer: pred.bet_layer || null,
+                    recommendedBet: pred.recommended_bet || 0,
                   })
                 ),
                 isLoading: false,
@@ -1348,7 +1350,7 @@ export default function Home() {
                     <span style={{ fontSize: "24px" }}>🎯</span>
                     <div>
                       <h3 className="font-bold text-lg">今日の買い目</h3>
-                      <p className="text-sm opacity-90">EV≥2.0 & AI上位3頭（回収率重視）</p>
+                      <p className="text-sm opacity-90">本命層(60%↑) + 穴馬層(40%↑&高配当)</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1501,7 +1503,7 @@ export default function Home() {
                   </span>
                 </div>
                 <span className="text-xs" style={{ color: "#a16207" }}>
-                  EVは複勝オッズで計算
+                  確率ベースで安定した買い目
                 </span>
               </div>
             </div>
