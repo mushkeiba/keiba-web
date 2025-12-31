@@ -262,21 +262,22 @@ interface AutoBet {
   result?: number; // 着順
 }
 
-// 自動買い目を計算（高回収率戦略：3つのフィルター適用）
-// 参考: https://qiita.com/umaro_ai/items/d1e0b61f90098ee7fbcb
+// 自動買い目を計算（Optuna最適化済みフィルター適用）
+// 最適化: scripts/optimize_filters.py → models/optimal_filters.json
 function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
   const bets: AutoBet[] = [];
 
-  // === 高回収率フィルター設定 ===
-  const MIN_PROB_DIFF = 0.10;    // 1位と2位の確率差 ≥ 10%（回収率130%→168%）
-  const MIN_EV = 1.5;            // 期待値 ≥ 1.5（回収率147%達成ライン）
-  const MIN_RACE_NUMBER = 8;     // 8R以降のみ（後半レース特化）
-  const MIN_PLACE_ODDS = 1.3;    // 複勝オッズ1.3倍以上（緩和）
+  // === Optuna最適化済みフィルター設定 ===
+  // テスト期間(2025-10-01〜): 222点, 複勝的中率65.8%
+  const MIN_PROB_DIFF = 0.0427;  // 1位と2位の確率差 ≥ 4.27%
+  const MIN_PROB = 0.354;        // 最低確率 ≥ 35.4%
+  const MIN_RACE_NUMBER = 1;     // 全レース対象
+  const MIN_PLACE_ODDS = 1.3;    // 複勝オッズ1.3倍以上
 
   for (const race of races) {
     if (race.isLoading || race.predictions.length === 0) continue;
 
-    // フィルター1: 後半レース(8R以降)のみ
+    // フィルター1: レース番号
     const raceNum = parseInt(race.id.replace(/\D/g, '')) || 0;
     if (raceNum < MIN_RACE_NUMBER) continue;
 
@@ -294,24 +295,24 @@ function calculateAutoBets(races: RaceWithLoading[]): AutoBet[] {
     const second = sorted[1];
     const probDiff = first.prob - second.prob;
 
-    // フィルター2: 1位と2位の確率差 ≥ 10%
+    // フィルター2: 1位と2位の確率差 ≥ 4.27%
     if (probDiff < MIN_PROB_DIFF) continue;
 
-    const ev = first.expectedValue;
-    const placeOddsAvg = first.placeOdds || 0;
+    // フィルター3: 最低確率 ≥ 35.4%
+    if (first.prob < MIN_PROB) continue;
 
-    // フィルター3: 期待値 ≥ 1.5
-    if (ev < MIN_EV) continue;
+    const placeOddsAvg = first.placeOdds || 0;
 
     // フィルター4: オッズ条件
     if (placeOddsAvg < MIN_PLACE_ODDS) continue;
 
     // 全条件クリア → 買い目追加
-    // 期待値に応じた賭け金（高期待値ほど多く）
+    // 確率差に応じた賭け金（確率差が大きいほど自信度高い）
+    const ev = first.expectedValue;
     let betAmount = 200;
-    if (ev > 2.5) betAmount = 500;
-    else if (ev > 2.0) betAmount = 400;
-    else if (ev > 1.7) betAmount = 300;
+    if (probDiff > 0.15) betAmount = 500;      // 15%以上差: 高自信
+    else if (probDiff > 0.10) betAmount = 400; // 10%以上差: 中自信
+    else if (probDiff > 0.07) betAmount = 300; // 7%以上差: やや自信
 
     const betType: "本命" | "対抗" | "穴" = "本命";
 
