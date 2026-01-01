@@ -1267,25 +1267,25 @@ export default function Home() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
-                  <span>学習データ: <strong style={{ color: "#0d9488" }}>{modelInfo.data_count.toLocaleString()}件</strong></span>
+                  <span>学習データ: <strong style={{ color: "#0d9488" }}>{(modelInfo.data_count || 0).toLocaleString()}件</strong></span>
                 </div>
                 <div className="flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span>期間: {modelInfo.date_range.from} 〜 {modelInfo.date_range.to}</span>
+                  <span>期間: {modelInfo.date_range?.from || "N/A"} 〜 {modelInfo.date_range?.to || "N/A"}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  <span>精度(AUC): <strong style={{ color: "#0d9488" }}>{(modelInfo.auc * 100).toFixed(1)}%</strong></span>
+                  <span>精度(AUC): <strong style={{ color: "#0d9488" }}>{((modelInfo.auc || 0) * 100).toFixed(1)}%</strong></span>
                 </div>
                 <div className="flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>最終学習: {modelInfo.trained_at.split(" ")[0]}</span>
+                  <span>最終学習: {(modelInfo.trained_at || "").split(" ")[0] || "N/A"}</span>
                 </div>
               </div>
             )}
